@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>C盘瘦身助手 v4</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:#0d1117; color:#c9d1d9; min-height:100vh; }
+.container { max-width:1000px; margin:0 auto; padding:20px; }
+
+/* 顶部概览 */
+.overview { display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
+.card { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:16px; flex:1; min-width:160px; }
+.card-title { font-size:12px; color:#8b949e; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+.card-value { font-size:28px; font-weight:700; }
+.card-value.green { color:#3fb950; }
+.card-value.yellow { color:#d29922; }
+.card-value.blue { color:#58a6ff; }
+.card-value.purple { color:#bc8cff; }
+.card-sub { font-size:11px; color:#8b949e; margin-top:4px; }
+.progress-bar { background:#21262d; border-radius:4px; height:8px; margin-top:8px; overflow:hidden; }
+.progress-fill { height:100%; border-radius:4px; transition:width 0.5s; }
+
+/* Zone tabs */
+.zone-tabs { display:flex; gap:4px; margin-bottom:16px; background:#161b22; border-radius:8px; padding:4px; border:1px solid #30363d; flex-wrap:wrap; }
+.zone-tab { padding:8px 12px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; background:transparent; color:#8b949e; }
+.zone-tab:hover { background:#21262d; color:#c9d1d9; }
+.zone-tab.active { background:#1f6feb; color:#fff; }
+.zone-tab .tab-count { font-size:11px; margin-left:4px; opacity:0.7; }
+.zone-tab.admin-zone { border:1px dashed #d2992244; }
+
+/* 操作区 */
+.actions { display:flex; gap:12px; margin-bottom:24px; align-items:center; flex-wrap:wrap; }
+.btn { border:none; border-radius:6px; padding:8px 20px; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; }
+.btn-primary { background:#1f6feb; color:#fff; }
+.btn-primary:hover { background:#388bfd; }
+.btn-primary:disabled { background:#21262d; color:#8b949e; cursor:not-allowed; }
+.btn-danger { background:#da3633; color:#fff; }
+.btn-danger:hover { background:#f85149; }
+.btn-danger:disabled { background:#21262d; color:#8b949e; cursor:not-allowed; }
+.btn-secondary { background:#21262d; color:#c9d1d9; border:1px solid #30363d; }
+.btn-secondary:hover { background:#30363d; }
+.btn-warning { background:#d29922; color:#fff; }
+.btn-warning:hover { background:#e3b341; }
+.btn-warning:disabled { background:#21262d; color:#8b949e; cursor:not-allowed; }
+.btn-undo { background:#21262d; color:#58a6ff; border:1px solid #1f6feb44; font-size:11px; padding:2px 8px; cursor:pointer; }
+.btn-undo:hover { background:#1f6feb22; }
+.threshold-input { background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:6px 12px; color:#c9d1d9; font-size:14px; width:80px; }
+.threshold-label { font-size:13px; color:#8b949e; }
+
+/* 表格 */
+.table-container { background:#161b22; border:1px solid #30363d; border-radius:8px; overflow:hidden; margin-bottom:24px; }
+.table-header { display:flex; padding:12px 16px; background:#1c2128; border-bottom:1px solid #30363d; font-size:13px; color:#8b949e; font-weight:600; }
+.table-row { display:flex; padding:10px 16px; border-bottom:1px solid #21262d; transition:background 0.15s; }
+.table-row:hover { background:#1c2128; }
+.col-name { flex:2.5; min-width:140px; }
+.col-size { flex:1; min-width:80px; text-align:right; }
+.col-zone { flex:1.2; min-width:100px; }
+.col-status { flex:1.5; min-width:100px; }
+.col-action { flex:0.8; min-width:60px; text-align:center; }
+.row-name { font-weight:500; }
+.row-size { text-align:right; font-variant-numeric:tabular-nums; }
+.tag { font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600; white-space:nowrap; }
+.tag-junction { background:#1f6feb33; color:#58a6ff; border:1px solid #1f6feb44; }
+.tag-local { background:#3fb95033; color:#3fb950; border:1px solid #3fb95044; }
+.tag-admin { background:#d2992233; color:#d29922; border:1px solid #d2992244; }
+.tag-zone { background:#bc8cff22; color:#bc8cff; border:1px solid #bc8cff33; font-size:10px; }
+.checkbox { width:18px; height:18px; accent-color:#1f6feb; cursor:pointer; }
+
+/* 日志区 */
+.log-container { background:#161b22; border:1px solid #30363d; border-radius:8px; overflow:hidden; margin-bottom:24px; }
+.log-header { padding:12px 16px; background:#1c2128; border-bottom:1px solid #30363d; font-size:13px; color:#8b949e; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+.log-body { padding:12px 16px; font-family:'Cascadia Code','Consolas',monospace; font-size:12px; line-height:1.6; max-height:300px; overflow-y:auto; }
+.log-line { white-space:pre-wrap; }
+.log-line.success { color:#3fb950; }
+.log-line.error { color:#f85149; }
+.log-line.info { color:#58a6ff; }
+.log-line.warn { color:#d29922; }
+
+/* 状态栏 */
+.statusbar { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
+.statusbar-text { font-size:13px; color:#8b949e; }
+.spinner { width:16px; height:16px; border:2px solid #30363d; border-top:2px solid #58a6ff; border-radius:50%; animation:spin 0.8s linear infinite; display:none; }
+.spinner.active { display:inline-block; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* 空状态 */
+.empty-state { text-align:center; padding:40px; color:#8b949e; }
+.empty-icon { font-size:48px; margin-bottom:12px; }
+
+/* 安全提示 */
+.safety-note { background:#1c2128; border:1px solid #d2992244; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:#d29922; display:flex; align-items:center; gap:10px; }
+.safety-icon { font-size:20px; }
+
+/* 已迁移汇总 */
+.migrated-section { margin-bottom:24px; }
+.migrated-title { font-size:14px; color:#8b949e; margin-bottom:8px; font-weight:600; }
+.migrated-list { display:flex; flex-wrap:wrap; gap:6px; }
+.migrated-item { background:#1f6feb22; border:1px solid #1f6feb44; border-radius:4px; padding:4px 10px; font-size:12px; color:#58a6ff; display:flex; align-items:center; gap:6px; }
+
+/* No-go说明 */
+.nogo-info { background:#f8514911; border:1px solid #f8514944; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:#f85149; display:none; }
+.nogo-info.show { display:flex; align-items:flex-start; gap:10px; }
+.nogo-list { font-size:12px; color:#8b949e; margin-top:4px; }
+
+/* 统计摘要 */
+.summary-bar { display:flex; gap:16px; margin-bottom:16px; padding:12px 16px; background:#161b22; border:1px solid #30363d; border-radius:8px; flex-wrap:wrap; }
+.summary-item { font-size:13px; color:#8b949e; }
+.summary-item strong { color:#c9d1d9; }
+
+/* Admin提示 */
+.admin-note { background:#d2992211; border:1px solid #d2992244; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:#d29922; display:flex; align-items:center; gap:10px; }
+
+/* Admin elevate button */
+.btn-elevate { background:#1f6feb; color:#fff; border:1px solid #58a6ff44; font-size:12px; padding:4px 10px; cursor:pointer; border-radius:4px; }
+.btn-elevate:hover { background:#388bfd; }
+.btn-elevate:disabled { background:#21262d; color:#8b949e; cursor:not-allowed; }
+.btn-elevate.running { background:#d29922; animation:pulse 1s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
+
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1 style="font-size:24px;margin-bottom:6px;">💾 C盘瘦身助手 v4</h1>
+<p style="font-size:13px;color:#8b949e;margin-bottom:20px;">全面扫描 → Junction迁移 → 支持UAC管理员权限自动提升 → 纯英文脚本杜绝编码乱码</p>
+
+<div class="safety-note">
+  <span class="safety-icon">⚠️</span>
+  <span><b>安全机制：</b>Junction(mklink /J) ≠ Symbolic Link(mklink /D)。<br>
+  迁移流程：<b>复制到D盘 → 校验文件数 → 删原目录 → 创建Junction</b>。复制失败时不会删除原目录。<br>
+  只展示<b>绿色安全</b>项目，风险目录已自动隐藏。请在迁移前<b>关闭目标应用</b>！<br>
+  <b>注意：</b>如果D盘已有同名目录但内容不同，会执行增量合并，不会覆盖D盘已有文件。</span>
+</div>
+
+<div class="admin-note" id="admin-note" style="display:none;">
+  <span>🔑</span>
+  <span><b>管理员操作：</b>ProgramData和Program Files目录迁移需要管理员权限。<br>
+  点击「🔑 Elevate」按钮会自动触发UAC弹窗，你点"是"即可。如果UAC没弹出来，脚本也会生成在 c-drive-tool 目录中供手动运行。</span>
+</div>
+
+<div class="overview">
+  <div class="card">
+    <div class="card-title">C盘总容量</div>
+    <div class="card-value blue" id="c-total">--</div>
+  </div>
+  <div class="card">
+    <div class="card-title">C盘可用</div>
+    <div class="card-value green" id="c-free">--</div>
+    <div class="card-sub" id="c-free-pct">--</div>
+    <div class="progress-bar"><div class="progress-fill" id="c-progress" style="width:0;background:#3fb950;"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">D盘可用</div>
+    <div class="card-value purple" id="d-free">--</div>
+    <div class="card-sub">迁移目标</div>
+  </div>
+  <div class="card">
+    <div class="card-title">已释放</div>
+    <div class="card-value green" id="c-released">--</div>
+    <div class="card-sub" id="c-released-detail">0 个Junction</div>
+  </div>
+  <div class="card">
+    <div class="card-title">可释放</div>
+    <div class="card-value yellow" id="c-potential">--</div>
+    <div class="card-sub" id="c-potential-detail">0 个大目录</div>
+  </div>
+</div>
+
+<div class="summary-bar" id="summary-bar" style="display:none;">
+  <div class="summary-item">🔥 <strong id="sum-temp">0</strong> GB Temp缓存可清理</div>
+  <div class="summary-item">🟢 <strong id="sum-migrate">0</strong> GB 安全可迁移</div>
+  <div class="summary-item">🔵 <strong id="sum-junction">0</strong> GB 已Junction到D盘</div>
+</div>
+
+<div class="actions">
+  <button class="btn btn-primary" id="btn-scan" onclick="doScan()">🔍 全面扫描</button>
+  <button class="btn btn-danger" id="btn-migrate" onclick="doMigrate()" disabled>🚀 迁移选中项</button>
+  <button class="btn btn-warning" id="btn-clean-temp" onclick="cleanTemp()" disabled>🧹 清理Temp</button>
+  <button class="btn btn-secondary" id="btn-refresh" onclick="refreshStatus()">📊 刷新空间</button>
+  <span class="threshold-label">阈值(MB):</span>
+  <input type="number" class="threshold-input" id="threshold" value="100" min="1" max="10000">
+</div>
+
+<!-- Zone tabs - v3: 6个zone (移除禁区标签) -->
+<div class="zone-tabs" id="zone-tabs">
+  <div class="zone-tab active" data-zone="all" onclick="switchZone('all')">全部 <span class="tab-count" id="count-all">0</span></div>
+  <div class="zone-tab" data-zone="programs" onclick="switchZone('programs')">📦 Programs <span class="tab-count" id="count-programs">0</span></div>
+  <div class="zone-tab admin-zone" data-zone="programdata" onclick="switchZone('programdata')">🗄️ ProgramData <span class="tab-count" id="count-programdata">0</span></div>
+  <div class="zone-tab admin-zone" data-zone="programfiles" onclick="switchZone('programfiles')">💼 Program Files <span class="tab-count" id="count-programfiles">0</span></div>
+  <div class="zone-tab" data-zone="local" onclick="switchZone('local')">📁 Local <span class="tab-count" id="count-local">0</span></div>
+  <div class="zone-tab" data-zone="roaming" onclick="switchZone('roaming')">🔄 Roaming <span class="tab-count" id="count-roaming">0</span></div>
+  <div class="zone-tab" data-zone="localLow" onclick="switchZone('localLow')">⬇️ LocalLow <span class="tab-count" id="count-localLow">0</span></div>
+</div>
+
+<div class="migrated-section" id="migrated-section" style="display:none;">
+  <div class="migrated-title">已迁移到D盘的目录 (Junction) — 点击↩️撤销可恢复</div>
+  <div class="migrated-list" id="migrated-list"></div>
+</div>
+
+<div class="nogo-info" id="nogo-info">
+  <span>🚫</span>
+  <div>
+    <div style="font-weight:600;">系统保护目录（不可迁移）</div>
+    <div class="nogo-list" id="nogo-list"></div>
+    <div style="font-size:12px;color:#8b949e;margin-top:4px;">风险目录已自动隐藏，不会出现在扫描结果中。</div>
+  </div>
+</div>
+
+<div class="table-container" id="table-container">
+  <div class="table-header">
+    <div class="col-name">目录名</div>
+    <div class="col-size">大小</div>
+    <div class="col-zone">区域</div>
+    <div class="col-status">状态</div>
+    <div class="col-action">迁移</div>
+  </div>
+  <div id="table-body">
+    <div class="empty-state">
+      <div class="empty-icon">📂</div>
+      <p>点击「全面扫描」开始检测所有区域</p>
+    </div>
+  </div>
+</div>
+
+<div class="log-container" id="log-container" style="display:none;">
+  <div class="log-header">
+    <span>操作日志</span>
+    <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px;" onclick="clearLog()">清空</button>
+  </div>
+  <div class="log-body" id="log-body"></div>
+</div>
+
+<div class="statusbar">
+  <div class="statusbar-text" id="status-text">就绪</div>
+  <div class="spinner" id="spinner"></div>
+</div>
+
+</div>
+
+<script>
+// ===== 全局状态 =====
+let allData = { bigDirs: [], junctions: [], noGoDirs: [], tempSizeMB: 0 };
+let currentZone = 'all';
+let isProcessing = false;
+
+const ZONE_LABELS = {
+  programs: '📦 Programs',
+  local: '📁 Local',
+  roaming: '🔄 Roaming',
+  localLow: '⬇️ LocalLow',
+  programdata: '🗄️ ProgramData',
+  programfiles: '💼 Program Files'
+};
+
+const ADMIN_ZONES = ['programdata', 'programfiles'];
+
+// ===== API调用 =====
+async function callAPI(action, params={}) {
+  const resp = await fetch('/api/' + action, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(params)
+  });
+  return resp.json();
+}
+
+// ===== 扫描 =====
+async function doScan() {
+  if (isProcessing) return;
+  isProcessing = true;
+  setStatus('正在全面扫描C盘...', true);
+  document.getElementById('btn-scan').disabled = true;
+  addLog('开始全面扫描所有区域...', 'info');
+
+  const threshold = parseInt(document.getElementById('threshold').value) || 100;
+  const data = await callAPI('scan', {threshold});
+
+  allData = data;
+  updateOverview(data);
+  updateZoneCounts(data);
+  renderTable();
+  renderMigrated();
+  renderNoGo(data);
+
+  // 检查是否有admin zone的项目
+  const hasAdminDirs = data.bigDirs.some(d => d.needsAdmin);
+  document.getElementById('admin-note').style.display = hasAdminDirs ? 'flex' : 'none';
+
+  isProcessing = false;
+  setStatus('扫描完成', false);
+  document.getElementById('btn-scan').disabled = false;
+  document.getElementById('btn-clean-temp').disabled = false;
+  updateMigrateBtn();
+
+  addLog(`扫描完成: ${data.bigDirs.length} 个安全可迁移, ${data.junctions.length} 个已迁移`, 'success');
+  if (data.tempSizeMB > 100) addLog(`Temp缓存: ${formatSize(data.tempSizeMB)}`, 'warn');
+}
+
+// ===== 刷新空间 =====
+async function refreshStatus() {
+  setStatus('刷新空间信息...', true);
+  const data = await callAPI('status');
+  updateOverview({...allData, ...data});
+  setStatus('已刷新', false);
+}
+
+// ===== 清理Temp =====
+async function cleanTemp() {
+  if (isProcessing) return;
+  if (!confirm('确认清理C盘Temp目录中超过1天的临时文件？')) return;
+  isProcessing = true;
+  setStatus('正在清理Temp...', true);
+  addLog('开始清理Temp目录...', 'info');
+
+  const data = await callAPI('clean-temp');
+  if (data.success) {
+    addLog(`✓ Temp清理完成: 释放 ${formatSize(data.cleanedMB)}`, 'success');
+    const statusData = await callAPI('status');
+    allData.cFreeGB = statusData.cFreeGB;
+    updateOverview(allData);
+  } else {
+    addLog('✗ Temp清理失败', 'error');
+  }
+
+  isProcessing = false;
+  setStatus('Temp清理完成', false);
+}
+
+// ===== 迁移 =====
+async function doMigrate() {
+  if (isProcessing) return;
+  // Check: admin dirs should be handled via separate Elevate buttons, filter them out
+  const checked = getCheckedDirs();
+  if (checked.length === 0) { alert('请先勾选要迁移的目录'); return; }
+
+  const totalSize = checked.reduce((s,d) => s + d.sizeMB, 0);
+  if (!confirm(`确认迁移 ${checked.length} 个目录到D盘？\n总大小: ${formatSize(totalSize)}\n\n⚠️ 请确保目标应用已关闭！\n迁移流程：复制→删原目录→创建Junction`)) return;
+
+  isProcessing = true;
+  setStatus('正在迁移...', true);
+  document.getElementById('btn-migrate').disabled = true;
+  document.getElementById('btn-scan').disabled = true;
+  showLog();
+
+  for (const dir of checked) {
+    addLog(`开始迁移: ${dir.name} (${formatSize(dir.sizeMB)}) [${ZONE_LABELS[dir.zone] || dir.zone}]`, 'info');
+    const data = await callAPI('migrate', {path: dir.path, dest: dir.dest, name: dir.name});
+
+    if (data.success) {
+      addLog(`✓ ${dir.name} 迁移成功 → ${data.target || dir.dest}`, 'success');
+      if (data.steps) data.steps.forEach(s => addLog(`  ${s}`, 'info'));
+      allData.bigDirs = allData.bigDirs.filter(d => d.path !== dir.path);
+      allData.junctions.push({name: dir.name, target: data.target || dir.dest, zone: dir.zone});
+    } else {
+      addLog(`✗ ${dir.name} 迁移失败: ${data.error}`, 'error');
+      if (data.needsAdmin) addLog('💡 需要管理员权限，请使用🔑 Elevate按钮', 'warn');
+      else if (data.error.includes('进程') || data.error.includes('锁定')) addLog('💡 请关闭该应用后重试', 'warn');
+    }
+  }
+
+  const statusData = await callAPI('status');
+  allData.cFreeGB = statusData.cFreeGB;
+  allData.dFreeGB = statusData.dFreeGB;
+  updateOverview(allData);
+  updateZoneCounts(allData);
+  renderTable();
+  renderMigrated();
+
+  isProcessing = false;
+  setStatus('迁移完成', false);
+  document.getElementById('btn-migrate').disabled = false;
+  document.getElementById('btn-scan').disabled = false;
+  updateMigrateBtn();
+}
+
+// ===== 撤销迁移 =====
+async function doUndo(path, name) {
+  if (isProcessing) return;
+  if (!confirm(`确认撤销迁移 "${name}"？\n数据将从D盘回迁到C盘，恢复原始状态。\n回迁可能需要几分钟。`)) return;
+
+  isProcessing = true;
+  setStatus('正在撤销迁移...', true);
+  showLog();
+  addLog(`开始撤销: ${name}`, 'info');
+
+  const data = await callAPI('undo', {path, name});
+
+  if (data.success) {
+    addLog(`✓ ${name} 撤销成功，数据已回迁到C盘 (${formatSize(parseFloat(data.sizeMB || 0))})`, 'success');
+    if (data.steps) data.steps.forEach(s => addLog(`  ${s}`, 'info'));
+    // 从junction列表移除，重新扫描
+    allData.junctions = allData.junctions.filter(j => j.name !== name);
+  } else {
+    addLog(`✗ ${name} 撤销失败: ${data.error}`, 'error');
+    if (data.needsAdmin) addLog('💡 需要管理员权限撤销，请手动操作', 'warn');
+  }
+
+  const statusData = await callAPI('status');
+  allData.cFreeGB = statusData.cFreeGB;
+  updateOverview(allData);
+  renderMigrated();
+
+  isProcessing = false;
+  setStatus('撤销完成', false);
+}
+
+// ===== Zone切换 =====
+function switchZone(zone) {
+  currentZone = zone;
+  document.querySelectorAll('.zone-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.zone === zone);
+  });
+  renderTable();
+}
+
+// ===== UI渲染 =====
+function updateOverview(data) {
+  const freeGB = data.cFreeGB || 0;
+  const totalGB = data.cTotalGB || 400;
+  const dFreeGB = data.dFreeGB || 0;
+  const pct = Math.round(freeGB / totalGB * 100);
+
+  document.getElementById('c-total').textContent = totalGB + ' GB';
+  document.getElementById('c-free').textContent = freeGB.toFixed(1) + ' GB';
+  document.getElementById('c-free-pct').textContent = `已用 ${100-pct}%`;
+  document.getElementById('d-free').textContent = dFreeGB.toFixed(1) + ' GB';
+
+  const progressEl = document.getElementById('c-progress');
+  progressEl.style.width = pct + '%';
+  progressEl.style.background = pct > 50 ? '#3fb950' : pct > 25 ? '#d29922' : '#f85149';
+
+  const releasedGB = data.releasedGB || 0;
+  document.getElementById('c-released').textContent = releasedGB > 0 ? releasedGB.toFixed(1) + ' GB' : '0 GB';
+  document.getElementById('c-released-detail').textContent = `${(data.junctions||[]).length} 个Junction`;
+
+  const potentialGB = data.potentialGB || Math.round((data.bigDirs||[]).reduce((s,d) => s + d.sizeMB, 0) / 1024 * 100) / 100;
+  document.getElementById('c-potential').textContent = potentialGB > 0 ? potentialGB.toFixed(2) + ' GB' : '0 GB';
+  document.getElementById('c-potential-detail').textContent = `${(data.bigDirs||[]).length} 个大目录`;
+
+  const summaryBar = document.getElementById('summary-bar');
+  if (data.bigDirs && data.bigDirs.length > 0) {
+    summaryBar.style.display = 'flex';
+    const tempGB = (data.tempSizeMB || 0) / 1024;
+    document.getElementById('sum-temp').textContent = tempGB.toFixed(1);
+    document.getElementById('sum-migrate').textContent = potentialGB.toFixed(1);
+    document.getElementById('sum-junction').textContent = releasedGB.toFixed(1);
+  }
+}
+
+function updateZoneCounts(data) {
+  const dirs = data.bigDirs || [];
+  document.getElementById('count-all').textContent = dirs.length;
+  document.getElementById('count-programs').textContent = dirs.filter(d => d.zone === 'programs').length;
+  document.getElementById('count-programdata').textContent = dirs.filter(d => d.zone === 'programdata').length;
+  document.getElementById('count-programfiles').textContent = dirs.filter(d => d.zone === 'programfiles').length;
+  document.getElementById('count-local').textContent = dirs.filter(d => d.zone === 'local').length;
+  document.getElementById('count-roaming').textContent = dirs.filter(d => d.zone === 'roaming').length;
+  document.getElementById('count-localLow').textContent = dirs.filter(d => d.zone === 'localLow').length;
+}
+
+function renderTable() {
+  const body = document.getElementById('table-body');
+  let dirs = allData.bigDirs || [];
+
+  if (currentZone !== 'all') {
+    dirs = dirs.filter(d => d.zone === currentZone);
+  }
+
+  if (dirs.length === 0) {
+    body.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><p>该区域没有超过阈值的大目录</p></div>';
+    return;
+  }
+
+  body.innerHTML = dirs.map(d => {
+    const isAdmin = d.needsAdmin;
+    const statusTag = isAdmin ? '<span class="tag tag-admin">🔑 需管理员</span>' : '<span class="tag tag-local">在C盘</span>';
+    let actionCell;
+    if (isAdmin) {
+      actionCell = `<button class="btn-elevate" id="elevate-${d.name}" data-name="${d.name}" data-path="${d.path}" data-dest="${d.dest}" data-size="${d.sizeMB}" data-zone="${d.zone}">🔑 Elevate</button>`;
+    } else {
+      actionCell = `<input type="checkbox" class="checkbox" data-name="${d.name}" data-path="${d.path}" data-dest="${d.dest}" data-size="${d.sizeMB}" data-zone="${d.zone}" data-needsadmin="${isAdmin}" onchange="updateMigrateBtn()">`;
+    }
+    return `
+      <div class="table-row" data-path="${d.path}">
+        <div class="col-name"><span class="row-name">${d.name}</span></div>
+        <div class="col-size"><span class="row-size">${formatSize(d.sizeMB)}</span></div>
+        <div class="col-zone"><span class="tag tag-zone">${ZONE_LABELS[d.zone] || d.zone}</span></div>
+        <div class="col-status">${statusTag}</div>
+        <div class="col-action">${actionCell}</div>
+      </div>
+    `;
+  }).join('');
+
+  // Bind event listeners on elevate buttons (data-* avoids JS escape eating backslashes)
+  document.querySelectorAll('.btn-elevate:not(.btn-elevate-undo)').forEach(btn => {
+    btn.addEventListener('click', () => {
+      doAdminMigrate(btn.dataset.name, btn.dataset.path, btn.dataset.dest, parseFloat(btn.dataset.size), btn.dataset.zone);
+    });
+  });
+}
+
+function renderMigrated() {
+  const section = document.getElementById('migrated-section');
+  const list = document.getElementById('migrated-list');
+  const junctions = allData.junctions || [];
+  if (junctions.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  list.innerHTML = junctions.map(d => {
+    const isAdmin = ADMIN_ZONES.includes(d.zone);
+    const src = getJunctionSource(d);
+    const undoBtn = isAdmin
+      ? `<button class="btn-elevate btn-elevate-undo" data-name="${d.name}" data-path="${src}" data-dest="${d.target || ''}" data-zone="${d.zone}">🔑 Undo</button>`
+      : `<button class="btn-undo btn-undo-normal" data-name="${d.name}" data-path="${src}">↩️ 撤销</button>`;
+    return `<div class="migrated-item" title="${d.target}">${d.name} → D盘 ${undoBtn}</div>`;
+  }).join('');
+
+  // Bind event listeners on admin undo buttons
+  document.querySelectorAll('.btn-elevate-undo').forEach(btn => {
+    btn.addEventListener('click', () => {
+      doAdminUndo(btn.dataset.name, btn.dataset.path, btn.dataset.dest, btn.dataset.zone);
+    });
+  });
+
+  // Bind event listeners on normal undo buttons (data-* avoids JS escape eating backslashes)
+  document.querySelectorAll('.btn-undo-normal').forEach(btn => {
+    btn.addEventListener('click', () => {
+      doUndo(btn.dataset.path, btn.dataset.name);
+    });
+  });
+}
+
+function getJunctionSource(j) {
+  // Determine the C drive source path from zone + name
+  const zoneConfig = {
+    programs: `C:\\Users\\raoxi\\AppData\\Local\\Programs`,
+    local: `C:\\Users\\raoxi\\AppData\\Local`,
+    roaming: `C:\\Users\\raoxi\\AppData\\Roaming`,
+    localLow: `C:\\Users\\raoxi\\AppData\\LocalLow`,
+    programdata: `C:\\ProgramData`,
+    programfiles: `C:\\Program Files`
+  };
+  return (zoneConfig[j.zone] || '') + '\\' + j.name;
+}
+
+function renderNoGo(data) {
+  const noGoDirs = data.noGoDirs || [];
+  const infoEl = document.getElementById('nogo-info');
+  const listEl = document.getElementById('nogo-list');
+  if (noGoDirs.length > 0) {
+    infoEl.classList.add('show');
+    listEl.innerHTML = noGoDirs.map(d => `${d.name} (${formatSize(d.sizeMB)})`).join(' | ');
+  }
+}
+
+function getCheckedDirs() {
+  const checkboxes = document.querySelectorAll('.checkbox:checked');
+  return Array.from(checkboxes).map(cb => ({
+    name: cb.dataset.name,
+    path: cb.dataset.path,
+    dest: cb.dataset.dest,
+    sizeMB: parseFloat(cb.dataset.size),
+    zone: cb.dataset.zone,
+    needsAdmin: cb.dataset.needsadmin === 'true'
+  }));
+}
+
+function updateMigrateBtn() {
+  const checked = getCheckedDirs();
+  document.getElementById('btn-migrate').disabled = checked.length === 0 || isProcessing;
+}
+
+function formatSize(mb) {
+  if (mb >= 1024) return (mb/1024).toFixed(2) + ' GB';
+  return mb.toFixed(0) + ' MB';
+}
+
+function setStatus(text, spinning) {
+  document.getElementById('status-text').textContent = text;
+  const spinner = document.getElementById('spinner');
+  spinner.classList.toggle('active', spinning);
+}
+
+function showLog() {
+  document.getElementById('log-container').style.display = 'block';
+}
+
+function addLog(text, type='') {
+  const body = document.getElementById('log-body');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + type;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+  body.appendChild(line);
+  body.scrollTop = body.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('log-body').innerHTML = '';
+}
+
+// ===== Admin Migration (UAC Elevation) =====
+let adminPollTimer = null;
+
+async function doAdminMigrate(name, path, dest, sizeMB, zone) {
+  if (isProcessing) return;
+  if (!confirm(`Confirm admin migration of "${name}" (${formatSize(sizeMB)})?\n\nThis will trigger a UAC prompt. Click "Yes" to proceed.\n\nMake sure the target app is closed!`)) return;
+
+  isProcessing = true;
+  showLog();
+  addLog(`Requesting UAC elevation for: ${name}`, 'info');
+
+  // Disable the button
+  const btn = document.getElementById(`elevate-${name}`);
+  if (btn) { btn.disabled = true; btn.classList.add('running'); btn.textContent = '⏳ Waiting...'; }
+
+  const data = await callAPI('admin-migrate', {path, dest, name, sizeMB});
+
+  if (data.uacTriggered) {
+    addLog(`✓ UAC prompt triggered! Click "Yes" on the Windows permission popup.`, 'success');
+    addLog(`  Script: ${data.scriptFile}`, 'info');
+    setStatus('Waiting for admin migration to complete...', true);
+    // Poll for result
+    pollAdminResult(name, data.resultFile, 'migrate');
+  } else {
+    addLog(`⚠️ Auto UAC failed. Please run manually:`, 'warn');
+    addLog(`  ${data.instructions}`, 'warn');
+    addLog(`  Script file: ${data.scriptFile}`, 'info');
+    if (btn) { btn.disabled = false; btn.classList.remove('running'); btn.textContent = '🔑 Elevate'; }
+    isProcessing = false;
+    setStatus('Manual admin migration required', false);
+  }
+}
+
+async function doAdminUndo(name, path, dest, zone) {
+  if (isProcessing) return;
+  if (!confirm(`Confirm admin undo of "${name}"?\n\nData will be copied back from D to C drive.\nThis will trigger a UAC prompt. Click "Yes" to proceed.`)) return;
+
+  isProcessing = true;
+  showLog();
+  addLog(`Requesting UAC elevation for undo: ${name}`, 'info');
+
+  const data = await callAPI('admin-undo', {path, name, dest});
+
+  if (data.uacTriggered) {
+    addLog(`✓ UAC prompt triggered! Click "Yes" to proceed.`, 'success');
+    setStatus('Waiting for admin undo to complete...', true);
+    pollAdminResult(name, data.resultFile, 'undo');
+  } else {
+    addLog(`⚠️ Auto UAC failed. Please run manually:`, 'warn');
+    addLog(`  ${data.instructions}`, 'warn');
+    isProcessing = false;
+    setStatus('Manual admin undo required', false);
+  }
+}
+
+function pollAdminResult(name, resultFile, action) {
+  let attempts = 0;
+  const maxAttempts = action === 'migrate' ? 120 : 60;  // 10 min for migrate, 5 min for undo
+
+  addLog(`Polling for result... (max ${maxAttempts/12} min)`, 'info');
+
+  if (adminPollTimer) clearInterval(adminPollTimer);
+
+  adminPollTimer = setInterval(async () => {
+    attempts++;
+    if (attempts > maxAttempts) {
+      clearInterval(adminPollTimer);
+      adminPollTimer = null;
+      addLog(`⏰ Timeout waiting for admin script result. Check the CMD window.`, 'warn');
+      const btn = document.getElementById(`elevate-${name}`);
+      if (btn) { btn.disabled = false; btn.classList.remove('running'); btn.textContent = '🔑 Elevate'; }
+      isProcessing = false;
+      setStatus('Admin operation timeout - check CMD window', false);
+      return;
+    }
+
+    const result = await callAPI('admin-result', {name});
+
+    if (result.pending) {
+      // Still running, update status every 5 seconds
+      if (attempts % 5 === 0) {
+        addLog(`Still waiting... (${attempts * 5}s elapsed)`, 'info');
+      }
+      return;
+    }
+
+    clearInterval(adminPollTimer);
+    adminPollTimer = null;
+
+    if (result.success) {
+      addLog(`✓ Admin ${action} complete: ${name} (${formatSize(result.sizeMB || 0)} freed)`, 'success');
+      addLog(`  Raw result: ${result.raw}`, 'info');
+    } else {
+      addLog(`✗ Admin ${action} failed: ${result.error || result.raw}`, 'error');
+    }
+
+    // Re-scan to update state
+    addLog('Refreshing scan...', 'info');
+    await doScan();
+
+    const btn = document.getElementById(`elevate-${name}`);
+    if (btn) { btn.disabled = false; btn.classList.remove('running'); btn.textContent = '🔑 Elevate'; }
+    isProcessing = false;
+    setStatus('Admin operation complete', false);
+  }, 5000);  // Poll every 5 seconds
+}
+
+// 初始加载
+refreshStatus();
+</script>
+</body>
+</html>
