@@ -1,4 +1,4 @@
-# DiskJunction 开源化规划
+# CDriveCleaner 开源化规划
 
 > 把个人脚本「C盘瘦身助手 v4」变成可公开发布的 Windows 开源工具。
 >
@@ -10,7 +10,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 工具名 | **DiskJunction**（暂定，可改） |
+| 工具名 | **CDriveCleaner** |
 | 一句话定位 | 用 NTFS Junction 把 C 盘大目录无损迁移到 D 盘，释放系统盘空间 |
 | 核心机制 | robocopy 复制 → 校验 → 删原目录 → mklink /J 创建 Junction（可撤销） |
 | 目标用户 | Windows 10/11 用户，C 盘空间紧张，不想重装系统 |
@@ -40,7 +40,7 @@
 | 开源协议 | MIT | 最宽松最流行，利于传播 |
 | 打包方式 | PyInstaller 单 exe | 用户零依赖，双击即用 |
 | 代码托管 | GitHub | Actions CI 免费，国际可见度 |
-| 命名 | DiskJunction（纯英文） | 体现核心机制，国际化 |
+| 命名 | CDriveCleaner | 体现核心目标（C盘瘦身），国际化 |
 | 后端语言 | Python（保持现状） | 已有成熟代码，不重写 |
 | 前端 | 原生 HTML/JS（保持现状） | 单文件易打包，无需构建链 |
 | 外部依赖 | 仅 Python 标准库 | 降低打包体积和供应链风险 |
@@ -53,7 +53,7 @@
 - [ ] `git init` + 首次提交（保留当前可工作版本作为 baseline）
 - [ ] 建立目录结构：
   ```
-  DiskJunction/
+  CDriveCleaner/
     src/              # Python 源码（Phase 2 拆分后填入）
     web/              # 前端资源
     scripts/          # 构建/打包脚本
@@ -133,11 +133,11 @@
 ### Phase 4 · 打包分发
 **目标**：用户双击 exe 即用，不用装 Python。
 
-- [ ] PyInstaller spec 文件（`--onefile --windowed --name DiskJunction`）
+- [ ] PyInstaller spec 文件（`--onefile --windowed --name CDriveCleaner`）
 - [ ] 前端资源用 `--add-data` 打包
 - [ ] 图标设计（.ico）
 - [ ] GitHub Actions workflow：push tag `v*` 时自动构建 Windows exe
-- [ ] Release 自动打包：`DiskJunction-vX.Y.Z.zip`（含 exe + README）
+- [ ] Release 自动打包：`CDriveCleaner-vX.Y.Z.zip`（含 exe + README）
 - [ ] 版本号语义化（SemVer），版本写入 `__version__.py`
 - [ ] 启动时检查单实例（避免端口 8765 冲突）
 
@@ -219,7 +219,7 @@ DiskJunction/
 
 ## 7. 待定项
 
-- [ ] 工具最终英文名确认（暂定 DiskJunction）
+- [x] 工具最终英文名确认：CDriveCleaner
 - [ ] 是否需要多语言切换（中/英 UI）
 - [ ] 是否支持迁移到 D 盘以外的盘符（config 可配，但 UI 要不要暴露）
 - [ ] 图标设计方向
