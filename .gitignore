@@ -31,7 +31,7 @@ ENV/
 *.spec
 build/
 
-# Runtime-generated files (server.py creates these on the fly)
+# Runtime-generated files (powershell.py / admin_ops.py create these on the fly)
 _temp_script.ps1
 _admin_result_*.txt
 Admin-*-*.bat

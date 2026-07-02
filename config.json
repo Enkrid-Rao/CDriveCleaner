@@ -1,0 +1,66 @@
+{
+  "version": "1.0",
+  "port": 8765,
+  "threshold_mb": 100,
+  "target_drive": "D",
+  "temp_retention_days": 1,
+  "zones": {
+    "programs": {
+      "source": "{USERPROFILE}\\AppData\\Local\\Programs",
+      "dest_base": "D:\\AppData\\Programs",
+      "no_go": [],
+      "label": "应用程序",
+      "icon": "📦",
+      "needs_admin": false
+    },
+    "local": {
+      "source": "{USERPROFILE}\\AppData\\Local",
+      "dest_base": "D:\\AppData\\Local",
+      "no_go": ["Microsoft", "Packages", "Comms", "Deployment", "assembly",
+                "Application Data", "Temp", "Programs"],
+      "label": "应用数据(Local)",
+      "icon": "📁",
+      "needs_admin": false
+    },
+    "roaming": {
+      "source": "{USERPROFILE}\\AppData\\Roaming",
+      "dest_base": "D:\\AppData\\Roaming",
+      "no_go": ["Microsoft"],
+      "label": "应用数据(Roaming)",
+      "icon": "🔄",
+      "needs_admin": false
+    },
+    "localLow": {
+      "source": "{USERPROFILE}\\AppData\\LocalLow",
+      "dest_base": "D:\\AppData\\LocalLow",
+      "no_go": ["Microsoft"],
+      "label": "应用数据(LocalLow)",
+      "icon": "⬇️",
+      "needs_admin": false
+    },
+    "programdata": {
+      "source": "C:\\ProgramData",
+      "dest_base": "D:\\ProgramData",
+      "no_go": ["Microsoft", "Package Cache", "Windows", "NVIDIA Corporation",
+                "Intel", "Adobe", "USOShared", "SoftwareDistribution",
+                "System32", "Ssh", "ssh", "MicrosoftSearch", "WinAmp"],
+      "label": "共享数据(ProgramData)",
+      "icon": "🗄️",
+      "needs_admin": true
+    },
+    "programfiles": {
+      "source": "C:\\Program Files",
+      "dest_base": "D:\\Program Files",
+      "no_go": ["Microsoft", "Microsoft Visual Studio", "Microsoft Office", "Microsoft OneDrive",
+                "Windows Defender", "Windows Defender Advanced Threat Protection", "Windows Security",
+                "Adobe", "Common Files", "Internet Explorer",
+                "WindowsApps", "ModifiableWindowsApps", "Windows Communication Foundation",
+                "Windows Media Player", "Windows Photo Viewer", "Windows Portable Devices",
+                "Windows Sidebar", "MSBuild", "dotnet", "Reference Assemblies",
+                "NVIDIA Corporation", "WSL"],
+      "label": "应用本体(Program Files)",
+      "icon": "💼",
+      "needs_admin": true
+    }
+  }
+}

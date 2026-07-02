@@ -72,24 +72,41 @@ python src/server.py
 
 ```
 DiskJunction/
+  config.json        # 配置文件 (zones/阈值/端口, 支持 {USERPROFILE} 占位符)
   src/
-    server.py        # HTTP 后端 + 扫描/迁移/撤销逻辑
+    __init__.py      # 包初始化
+    __main__.py      # 入口 (python -m src)
+    config.py        # 配置加载与路径解析
+    powershell.py    # PowerShell 执行辅助
+    scanner.py       # 磁盘扫描逻辑
+    migrator.py      # 目录迁移与撤销
+    admin_ops.py     # UAC 提权与 .bat 生成
+    web_api.py       # HTTP API 服务
   web/
     index.html       # 前端 UI (自包含, 无构建依赖)
   启动.bat           # Windows 启动入口
 ```
 
-> 当前处于开源化重构早期（Phase 0），代码尚未模块化。完整架构见 [PLAN.md](PLAN.md)。
-
 ### 本地开发
 
 ```bash
 # 启动开发服务器
-python src/server.py
+python -m src
 
 # 访问 UI
 # http://localhost:8765
 ```
+
+需要 Python 3.10+，仅依赖标准库。
+
+### 配置
+
+首次运行自动生成 `config.json`，可自定义：
+
+- `port`: HTTP 服务端口（默认 8765）
+- `threshold_mb`: 扫描阈值（默认 100 MB）
+- `temp_retention_days`: Temp 清理保留天数（默认 1 天）
+- `zones`: 扫描区域配置，source 路径支持 `{USERPROFILE}` 占位符
 
 ### 贡献
 
@@ -98,8 +115,8 @@ python src/server.py
 ## 路线图
 
 - [x] Phase 0: 项目骨架与开源化基础
-- [ ] Phase 1: 去硬编码，支持任意用户环境
-- [ ] Phase 2: 架构重构与模块化
+- [x] Phase 1: 去硬编码，支持任意用户环境
+- [x] Phase 2: 架构重构与模块化
 - [ ] Phase 3: 安全加固（日志/快照/回滚）
 - [ ] Phase 4: PyInstaller 打包与 CI
 - [ ] Phase 5: 开源治理与文档完善

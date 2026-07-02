@@ -11,10 +11,11 @@
 - 去硬编码：动态获取用户名/路径（`os.getenv('USERPROFILE')`/`USERNAME`/`TEMP`），支持任意 Windows 环境
 - Junction 扫描输出完整 source 路径，前端不再猜路径
 - 启动脚本去除 WorkBuddy 私人 Python 路径，改用系统 `python`
+- 配置文件 `config.json`：zone 规则、阈值、端口、Temp 保留天数可配置，支持 `{USERPROFILE}` 占位符
+- 架构重构：781 行单文件拆分为 7 个模块（`config/powershell/scanner/migrator/admin_ops/web_api/__main__`）
+- 启动方式改为 `python -m src`（包模式，支持相对导入）
 
 ### 计划中
-- 配置文件 `config.json`：zone 规则、阈值、目标盘符可配置
-- 架构重构：拆分 `server.py` 为 `scanner/migrator/admin_ops/config/logger/web_api` 模块
 - 安全加固：文件日志、迁移前快照、自动回滚机制
 - PyInstaller 打包为单 exe
 - GitHub Actions 自动构建
