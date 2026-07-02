@@ -1,8 +1,8 @@
 @echo off
 chcp 65001 >nul
-title DiskJunction
+title CDriveCleaner
 echo ========================================
-echo   DiskJunction - 正在启动...
+echo   CDriveCleaner - 正在启动...
 echo ========================================
 echo.
 echo 启动后请在浏览器访问: http://localhost:8765

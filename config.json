@@ -7,7 +7,7 @@
   "zones": {
     "programs": {
       "source": "{USERPROFILE}\\AppData\\Local\\Programs",
-      "dest_base": "D:\\AppData\\Programs",
+      "dest_base": "{TARGET_DRIVE}\\AppData\\Programs",
       "no_go": [],
       "label": "应用程序",
       "icon": "📦",
@@ -15,7 +15,7 @@
     },
     "local": {
       "source": "{USERPROFILE}\\AppData\\Local",
-      "dest_base": "D:\\AppData\\Local",
+      "dest_base": "{TARGET_DRIVE}\\AppData\\Local",
       "no_go": ["Microsoft", "Packages", "Comms", "Deployment", "assembly",
                 "Application Data", "Temp", "Programs"],
       "label": "应用数据(Local)",
@@ -24,7 +24,7 @@
     },
     "roaming": {
       "source": "{USERPROFILE}\\AppData\\Roaming",
-      "dest_base": "D:\\AppData\\Roaming",
+      "dest_base": "{TARGET_DRIVE}\\AppData\\Roaming",
       "no_go": ["Microsoft"],
       "label": "应用数据(Roaming)",
       "icon": "🔄",
@@ -32,7 +32,7 @@
     },
     "localLow": {
       "source": "{USERPROFILE}\\AppData\\LocalLow",
-      "dest_base": "D:\\AppData\\LocalLow",
+      "dest_base": "{TARGET_DRIVE}\\AppData\\LocalLow",
       "no_go": ["Microsoft"],
       "label": "应用数据(LocalLow)",
       "icon": "⬇️",
@@ -40,7 +40,7 @@
     },
     "programdata": {
       "source": "C:\\ProgramData",
-      "dest_base": "D:\\ProgramData",
+      "dest_base": "{TARGET_DRIVE}\\ProgramData",
       "no_go": ["Microsoft", "Package Cache", "Windows", "NVIDIA Corporation",
                 "Intel", "Adobe", "USOShared", "SoftwareDistribution",
                 "System32", "Ssh", "ssh", "MicrosoftSearch", "WinAmp"],
@@ -50,7 +50,7 @@
     },
     "programfiles": {
       "source": "C:\\Program Files",
-      "dest_base": "D:\\Program Files",
+      "dest_base": "{TARGET_DRIVE}\\Program Files",
       "no_go": ["Microsoft", "Microsoft Visual Studio", "Microsoft Office", "Microsoft OneDrive",
                 "Windows Defender", "Windows Defender Advanced Threat Protection", "Windows Security",
                 "Adobe", "Common Files", "Internet Explorer",

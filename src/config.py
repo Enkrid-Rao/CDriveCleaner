@@ -28,13 +28,13 @@ _PLACEHOLDERS = {
 }
 
 
-def _expand_path(raw: str) -> str:
+def _expand_path(raw: str, placeholders: dict[str, str] | None = None) -> str:
     """展开路径中的占位符。"""
+    ph = placeholders if placeholders is not None else _PLACEHOLDERS
     result = raw
-    for token, value in _PLACEHOLDERS.items():
+    for token, value in ph.items():
         result = result.replace(token, value)
     return result
-
 
 def _default_config() -> dict[str, Any]:
     """首次运行时生成默认配置（与 config.json 内容一致）。"""
@@ -47,7 +47,7 @@ def _default_config() -> dict[str, Any]:
         "zones": {
             "programs": {
                 "source": "{USERPROFILE}\\AppData\\Local\\Programs",
-                "dest_base": "D:\\AppData\\Programs",
+                "dest_base": "{TARGET_DRIVE}\\AppData\\Programs",
                 "no_go": [],
                 "label": "应用程序",
                 "icon": "📦",
@@ -55,7 +55,7 @@ def _default_config() -> dict[str, Any]:
             },
             "local": {
                 "source": "{USERPROFILE}\\AppData\\Local",
-                "dest_base": "D:\\AppData\\Local",
+                "dest_base": "{TARGET_DRIVE}\\AppData\\Local",
                 "no_go": ["Microsoft", "Packages", "Comms", "Deployment", "assembly",
                           "Application Data", "Temp", "Programs"],
                 "label": "应用数据(Local)",
@@ -64,7 +64,7 @@ def _default_config() -> dict[str, Any]:
             },
             "roaming": {
                 "source": "{USERPROFILE}\\AppData\\Roaming",
-                "dest_base": "D:\\AppData\\Roaming",
+                "dest_base": "{TARGET_DRIVE}\\AppData\\Roaming",
                 "no_go": ["Microsoft"],
                 "label": "应用数据(Roaming)",
                 "icon": "🔄",
@@ -72,7 +72,7 @@ def _default_config() -> dict[str, Any]:
             },
             "localLow": {
                 "source": "{USERPROFILE}\\AppData\\LocalLow",
-                "dest_base": "D:\\AppData\\LocalLow",
+                "dest_base": "{TARGET_DRIVE}\\AppData\\LocalLow",
                 "no_go": ["Microsoft"],
                 "label": "应用数据(LocalLow)",
                 "icon": "⬇️",
@@ -80,7 +80,7 @@ def _default_config() -> dict[str, Any]:
             },
             "programdata": {
                 "source": "C:\\ProgramData",
-                "dest_base": "D:\\ProgramData",
+                "dest_base": "{TARGET_DRIVE}\\ProgramData",
                 "no_go": ["Microsoft", "Package Cache", "Windows", "NVIDIA Corporation",
                           "Intel", "Adobe", "USOShared", "SoftwareDistribution",
                           "System32", "Ssh", "ssh", "MicrosoftSearch", "WinAmp"],
@@ -90,7 +90,7 @@ def _default_config() -> dict[str, Any]:
             },
             "programfiles": {
                 "source": "C:\\Program Files",
-                "dest_base": "D:\\Program Files",
+                "dest_base": "{TARGET_DRIVE}\\Program Files",
                 "no_go": ["Microsoft", "Microsoft Visual Studio", "Microsoft Office", "Microsoft OneDrive",
                           "Windows Defender", "Windows Defender Advanced Threat Protection", "Windows Security",
                           "Adobe", "Common Files", "Internet Explorer",
@@ -132,12 +132,17 @@ def load_config() -> dict[str, Any]:
 
 def _expand_config(cfg: dict[str, Any]) -> dict[str, Any]:
     """展开配置中所有 zone 的路径占位符。"""
+    # 动态读取 target_drive，合并到占位符表
+    target_drive = cfg.get("target_drive", "D")
+    placeholders = dict(_PLACEHOLDERS)
+    placeholders["{TARGET_DRIVE}"] = target_drive
+
     zones = cfg.get("zones", {})
     for zone_key, zone in zones.items():
         if "source" in zone:
-            zone["source"] = _expand_path(zone["source"])
+            zone["source"] = _expand_path(zone["source"], placeholders)
         if "dest_base" in zone:
-            zone["dest_base"] = _expand_path(zone["dest_base"])
+            zone["dest_base"] = _expand_path(zone["dest_base"], placeholders)
     return cfg
 
 
