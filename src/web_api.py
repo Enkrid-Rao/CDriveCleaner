@@ -38,10 +38,10 @@ def _get_web_dir() -> Path:
     """获取 web 目录路径，兼容源码运行和 PyInstaller 打包。
 
     - 源码运行：项目根目录下的 web/
-    - 打包运行：exe 同级的 web/（datas 打包的文件 PyInstaller 会解压到临时目录）
+    - 打包运行（onefile）：datas 文件运行时解压到 sys._MEIPASS 临时目录
     """
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent / "web"
+        return Path(sys._MEIPASS) / "web"
     return Path(__file__).resolve().parent.parent / "web"
 
 

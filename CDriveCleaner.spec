@@ -5,7 +5,7 @@
 block_cipher = None
 
 a = Analysis(
-    ['src/__main__.py'],                    # 入口
+    ['run.py'],                             # 入口（中转导入 src 包，避免相对导入失败）
     pathex=['.'],                           # 模块搜索路径
     binaries=[],
     datas=[
