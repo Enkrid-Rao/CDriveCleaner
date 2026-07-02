@@ -30,9 +30,9 @@ CDriveCleaner 用 Windows 原生的 **NTFS Junction**（目录符号链接）解
 
 ### 方式一：下载 exe（推荐普通用户）
 
-1. 前往 [Releases](../../releases) 下载最新版
+1. 前往 [Releases](https://github.com/Enkrid-Rao/CDriveCleaner/releases) 下载最新版
 2. 解压双击 `CDriveCleaner.exe`
-3. 浏览器自动打开 `http://localhost:8765`
+3. 浏览器手动访问 `http://localhost:8765`
 
 ### 方式二：源码运行（开发者）
 
@@ -119,7 +119,7 @@ python -m src
 - [x] Phase 1: 去硬编码，支持任意用户环境
 - [x] Phase 2: 架构重构与模块化
 - [ ] Phase 3: 安全加固（日志/快照/回滚）
-- [ ] Phase 4: PyInstaller 打包与 CI
+- [x] Phase 4: PyInstaller 打包与 CI
 - [ ] Phase 5: 开源治理与文档完善
 
 详见 [PLAN.md](PLAN.md)。
