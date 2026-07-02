@@ -532,16 +532,11 @@ function renderMigrated() {
 }
 
 function getJunctionSource(j) {
-  // Determine the C drive source path from zone + name
-  const zoneConfig = {
-    programs: `C:\\Users\\raoxi\\AppData\\Local\\Programs`,
-    local: `C:\\Users\\raoxi\\AppData\\Local`,
-    roaming: `C:\\Users\\raoxi\\AppData\\Roaming`,
-    localLow: `C:\\Users\\raoxi\\AppData\\LocalLow`,
-    programdata: `C:\\ProgramData`,
-    programfiles: `C:\\Program Files`
-  };
-  return (zoneConfig[j.zone] || '') + '\\' + j.name;
+  // Use the full source path returned by backend (no hardcoded username)
+  if (j.source) return j.source;
+  // Fallback: if backend didn't return source, we can't safely guess it
+  console.warn('Junction missing source path:', j);
+  return '';
 }
 
 function renderNoGo(data) {

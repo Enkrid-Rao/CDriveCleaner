@@ -12,7 +12,10 @@ import ctypes
 import time
 
 # ===== 路径配置 =====
-BASE_USER = r"C:\Users\raoxi"
+# 动态获取用户目录，支持任意 Windows 用户
+BASE_USER = os.getenv('USERPROFILE') or os.path.expanduser('~')
+TEMP_DIR = os.getenv('TEMP') or os.path.join(BASE_USER, 'AppData', 'Local', 'Temp')
+CURRENT_USER = os.getenv('USERNAME') or 'Everyone'
 
 SCAN_ZONES = {
     "programs": {
@@ -127,7 +130,7 @@ def scan_zone(zone_key, threshold_mb=100):
     foreach ($d in $dirs) {{
         $isNoGo = $NoGo -contains $d.Name
         if ($d.Attributes -match 'ReparsePoint') {{
-            "JUNCTION|$($d.Name)|$($d.Target)|{zone_key}"
+            "JUNCTION|$($d.Name)|$($d.Target)|{zone_key}|$($d.FullName)"
         }} elseif ($isNoGo) {{
             if (-not $SkipNoGoSize) {{
                 $size = (Get-ChildItem $d.FullName -Recurse -File -Force -ErrorAction SilentlyContinue |
@@ -159,8 +162,8 @@ def scan_zone(zone_key, threshold_mb=100):
         if not line:
             continue
         parts = line.split("|")
-        if line.startswith("JUNCTION|") and len(parts) >= 4:
-            junction_list.append({"name": parts[1], "target": parts[2], "zone": parts[3]})
+        if line.startswith("JUNCTION|") and len(parts) >= 5:
+            junction_list.append({"name": parts[1], "target": parts[2], "zone": parts[3], "source": parts[4]})
         elif line.startswith("NOGO|") and len(parts) >= 4:
             no_go_list.append({"name": parts[1], "sizeMB": float(parts[2]), "zone": parts[3]})
         elif line.startswith("BIG|") and len(parts) >= 6:
@@ -209,12 +212,12 @@ def scan_all(threshold_mb=100):
 
     # Temp大小
     temp_script = """
-    $tempPath = 'C:\\Users\\raoxi\\AppData\\Local\\Temp'
+    $tempPath = '__TEMP_DIR__'
     $size = (Get-ChildItem $tempPath -Recurse -File -Force -ErrorAction SilentlyContinue |
              Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
     if ($null -eq $size) { $size = 0 }
     [math]::Round($size / 1MB, 2)
-    """
+    """.replace('__TEMP_DIR__', TEMP_DIR)
     stdout, _, _ = run_ps(temp_script)
     temp_size_mb = float(stdout) if stdout else 0
 
@@ -316,7 +319,7 @@ def migrate_dir(source_path, dest_path, name):
 
     # Step 3: 设置权限
     steps.append("设置D盘目录权限")
-    subprocess.run(["icacls", dest_path, "/grant", "raoxi:F", "/t", "/q"],
+    subprocess.run(["icacls", dest_path, "/grant", f"{CURRENT_USER}:F", "/t", "/q"],
                    capture_output=True, timeout=120)
 
     # Step 4: 删除原目录
@@ -412,7 +415,7 @@ def undo_junction(source_path, name):
 
     # Step 4: 设置权限
     steps.append("设置C盘目录权限")
-    subprocess.run(["icacls", source_path, "/grant", "raoxi:F", "/t", "/q"],
+    subprocess.run(["icacls", source_path, "/grant", f"{CURRENT_USER}:F", "/t", "/q"],
                    capture_output=True, timeout=120)
 
     # Step 5: 验证
@@ -576,7 +579,7 @@ def try_uac_elevate_ps(bat_path):
 def clean_temp():
     """清理C盘Temp目录"""
     script = """
-    $tempPath = 'C:\\Users\\raoxi\\AppData\\Local\\Temp'
+    $tempPath = '__TEMP_DIR__'
     $before = (Get-ChildItem $tempPath -Recurse -File -Force -ErrorAction SilentlyContinue |
                Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
 
@@ -594,7 +597,7 @@ def clean_temp():
     if ($null -eq $after) { $after = 0 }
     $cleanedMB = [math]::Round(($before - $after) / 1MB, 2)
     "$cleanedMB"
-    """
+    """.replace('__TEMP_DIR__', TEMP_DIR)
     stdout, _, _ = run_ps(script)
     cleaned_mb = float(stdout) if stdout else 0
     return {"success": True, "cleanedMB": cleaned_mb}

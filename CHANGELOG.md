@@ -7,8 +7,12 @@
 
 ## [Unreleased]
 
+### 已完成
+- 去硬编码：动态获取用户名/路径（`os.getenv('USERPROFILE')`/`USERNAME`/`TEMP`），支持任意 Windows 环境
+- Junction 扫描输出完整 source 路径，前端不再猜路径
+- 启动脚本去除 WorkBuddy 私人 Python 路径，改用系统 `python`
+
 ### 计划中
-- 去硬编码：动态获取用户名/路径，支持任意 Windows 环境
 - 配置文件 `config.json`：zone 规则、阈值、目标盘符可配置
 - 架构重构：拆分 `server.py` 为 `scanner/migrator/admin_ops/config/logger/web_api` 模块
 - 安全加固：文件日志、迁移前快照、自动回滚机制
