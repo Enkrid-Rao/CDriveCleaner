@@ -8,10 +8,22 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
-# 临时 ps1 脚本存放路径（与 config.py 同目录）
-_SCRIPT_DIR = Path(__file__).resolve().parent
+
+def _get_script_dir() -> Path:
+    """获取临时脚本存放目录，兼容源码运行和 PyInstaller 打包。
+
+    - 源码运行：src/ 目录
+    - 打包运行：exe 同级目录（临时 ps1 放在 exe 旁边）
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+_SCRIPT_DIR = _get_script_dir()
 _TEMP_PS1 = _SCRIPT_DIR / "_temp_script.ps1"
 
 

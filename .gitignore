@@ -28,8 +28,8 @@ ENV/
 
 # PyInstaller
 *.manifest
-*.spec
 build/
+dist/
 
 # Runtime-generated files (powershell.py / admin_ops.py create these on the fly)
 _temp_script.ps1

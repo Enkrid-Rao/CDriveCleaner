@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -16,8 +17,19 @@ BASE_USER = os.getenv("USERPROFILE") or os.path.expanduser("~")
 TEMP_DIR = os.getenv("TEMP") or os.path.join(BASE_USER, "AppData", "Local", "Temp")
 CURRENT_USER = os.getenv("USERNAME") or "Everyone"
 
-# 项目根目录（config.py 在 src/ 下，根目录是上一级）
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+def _get_project_root() -> Path:
+    """获取项目根目录，兼容源码运行和 PyInstaller 打包。
+
+    - 源码运行：config.py 的上两级
+    - 打包运行：exe 所在目录（onefile 模式下 config.json 应在 exe 旁边）
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent
+
+
+PROJECT_ROOT = _get_project_root()
 CONFIG_PATH = PROJECT_ROOT / "config.json"
 
 # 占位符映射表

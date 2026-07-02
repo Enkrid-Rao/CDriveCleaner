@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -32,8 +33,19 @@ from .admin_ops import (
     read_admin_result,
 )
 
-# 前端文件路径（web/index.html）
-_WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
+def _get_web_dir() -> Path:
+    """获取 web 目录路径，兼容源码运行和 PyInstaller 打包。
+
+    - 源码运行：项目根目录下的 web/
+    - 打包运行：exe 同级的 web/（datas 打包的文件 PyInstaller 会解压到临时目录）
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent / "web"
+    return Path(__file__).resolve().parent.parent / "web"
+
+
+_WEB_DIR = _get_web_dir()
 _INDEX_HTML = _WEB_DIR / "index.html"
 
 

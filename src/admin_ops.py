@@ -8,13 +8,25 @@ from __future__ import annotations
 
 import ctypes
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
 from .powershell import run_ps
 
-# 脚本与结果文件存放目录（src/ 同级）
-_TOOL_DIR = Path(__file__).resolve().parent
+
+def _get_tool_dir() -> Path:
+    """获取工具目录，兼容源码运行和 PyInstaller 打包。
+
+    - 源码运行：src/ 目录
+    - 打包运行：exe 同级目录（admin bat 和结果文件放在 exe 旁边）
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+_TOOL_DIR = _get_tool_dir()
 
 
 def generate_admin_bat(
