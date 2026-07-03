@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import SCAN_ZONES, CURRENT_USER, TEMP_DIR, TEMP_RETENTION_DAYS
-from .powershell import run_ps
+from .powershell import run_ps, _NO_WINDOW
 from .scanner import get_drive_info
 
 # 进程名别名映射：迁移前检查目标应用是否在运行
@@ -82,7 +82,8 @@ def _robocopy(source: str, dest: str, extra_args: list[str] | None = None) -> in
     cmd = ["robocopy", source, dest, "/e", "/copy:DAT", "/xj", "/r:3", "/w:3", "/np"]
     if extra_args:
         cmd.extend(extra_args)
-    result = subprocess.run(cmd, capture_output=True, timeout=300)
+    result = subprocess.run(cmd, capture_output=True, timeout=300,
+                            creationflags=_NO_WINDOW)
     return result.returncode
 
 
@@ -108,6 +109,7 @@ def _delete_directory(source_path: str) -> bool:
     subprocess.run(
         ["robocopy", str(empty_dir), source_path, "/MIR", "/r:1", "/w:1"],
         capture_output=True, timeout=60,
+        creationflags=_NO_WINDOW,
     )
     stdout2, _, _ = run_ps(
         f"Remove-Item '\\\\?\\{source_path}' -Recurse -Force -ErrorAction SilentlyContinue; "
@@ -186,6 +188,7 @@ def migrate_dir(source_path: str, dest_path: str, name: str) -> dict[str, Any]:
     subprocess.run(
         ["icacls", dest_path, "/grant", f"{CURRENT_USER}:F", "/t", "/q"],
         capture_output=True, timeout=120,
+        creationflags=_NO_WINDOW,
     )
 
     # Step 5: 删除原目录
@@ -266,6 +269,7 @@ def undo_junction(source_path: str, name: str) -> dict[str, Any]:
     subprocess.run(
         ["icacls", source_path, "/grant", f"{CURRENT_USER}:F", "/t", "/q"],
         capture_output=True, timeout=120,
+        creationflags=_NO_WINDOW,
     )
 
     # Step 5: 验证
