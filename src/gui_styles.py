@@ -52,6 +52,14 @@ BLUE = "#58a6ff"
 TEAL = "#2dd4bf"
 PURPLE = "#bc8cff"
 
+# 字体栈
+# Qt 会对「每个字符」依次尝试字体列表：拉丁字符命中 JetBrains Mono（等宽、极客感），
+# 中文字符在 JetBrains Mono 中缺失，自动回退到雅黑/苹方等 CJK 字体 —— 即「中英不同字体」。
+# FONT_MONO：以等宽为主，末尾带 CJK 回退（日志/路径/数值等）。
+# FONT_UI ：以等宽打头、CJK 优先雅黑（通用 UI 文字、标题等）。
+FONT_MONO = "'JetBrains Mono', 'JetBrainsMono Nerd Font', 'Cascadia Code', 'Cascadia Mono', 'Consolas', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', monospace"
+FONT_UI = "'JetBrains Mono', 'JetBrainsMono Nerd Font', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', 'SimHei', sans-serif"
+
 
 # ============================================================
 # QSS 样式表
@@ -59,8 +67,7 @@ PURPLE = "#bc8cff"
 
 GLOBAL_QSS = f"""
 * {{
-    font-family: 'JetBrains Mono', 'JetBrainsMono Nerd Font', 'Cascadia Mono',
-                 'Microsoft YaHei UI', 'Microsoft YaHei', monospace;
+    font-family: {FONT_UI};
     font-size: 13px;
     color: {TEXT};
     outline: none;
@@ -87,7 +94,7 @@ QLabel#TitleVersion {{
     color: {TEXT_DIM};
     font-size: 11px;
     font-weight: 600;
-    font-family: 'JetBrains Mono', 'JetBrainsMono Nerd Font', 'Cascadia Mono', monospace;
+    font-family: {FONT_MONO};
 }}
 
 QPushButton#BtnClose, QPushButton#BtnMin, QPushButton#BtnMax {{
@@ -116,6 +123,7 @@ QLabel#SectionTitle {{
     color: {TEXT};
     font-size: 15px;
     font-weight: 700;
+    padding: 2px 2px;
 }}
 QLabel#SectionHint {{
     color: {TEXT_MUT};
@@ -127,7 +135,7 @@ QLabel#StatValue {{
     color: {TEXT};
     font-size: 22px;
     font-weight: 800;
-    font-family: 'JetBrains Mono', 'JetBrainsMono Nerd Font', 'Cascadia Mono', monospace;
+    font-family: {FONT_MONO};
 }}
 QLabel#StatLabel {{
     color: {TEXT_MUT};
@@ -153,13 +161,13 @@ QLabel#DirName {{
 QLabel#DirPath {{
     color: {TEXT_DIM};
     font-size: 11px;
-    font-family: 'JetBrains Mono', 'JetBrainsMono Nerd Font', 'Cascadia Mono', monospace;
+    font-family: {FONT_MONO};
 }}
 QLabel#DirSize {{
     color: {BRAND_2};
     font-size: 13px;
     font-weight: 700;
-    font-family: 'JetBrains Mono', 'JetBrainsMono Nerd Font', 'Cascadia Mono', monospace;
+    font-family: {FONT_MONO};
 }}
 QLabel#DirZone {{
     color: {TEXT_MUT};
@@ -370,6 +378,46 @@ QFrame#Note {{
 QLabel#NoteWarnText {{ color: {YELLOW}; }}
 QLabel#NoteInfoText {{ color: {BLUE}; }}
 QLabel#NoteDangerText {{ color: {RED}; }}
+
+/* ===== 可折叠区 ===== */
+QFrame#CollapsibleBox {{
+    background: transparent;
+    border: none;
+}}
+QPushButton#CollapseHeader {{
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 8px;
+    min-height: 42px;
+    text-align: left;
+}}
+QPushButton#CollapseHeader:hover {{
+    background: {SURFACE_3};
+}}
+QLabel#CollapseArrow {{
+    color: {TEXT_MUT};
+    font-size: 11px;
+    min-width: 14px;
+}}
+
+/* ===== 操作日志面板 ===== */
+QFrame#LogPanel {{
+    background: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 14px;
+    padding: 4px 4px 8px 4px;
+}}
+QTextEdit#LogBody {{
+    background: {BG_1};
+    border: 1px solid {BORDER};
+    border-radius: 8px;
+    color: {TEXT};
+    font-family: {FONT_MONO};
+    font-size: 12px;
+    padding: 8px 10px;
+    selection-background-color: {BRAND};
+}}
 """
 
 

@@ -145,7 +145,12 @@ def load_config() -> dict[str, Any]:
 def _expand_config(cfg: dict[str, Any]) -> dict[str, Any]:
     """展开配置中所有 zone 的路径占位符。"""
     # 动态读取 target_drive，合并到占位符表
+    # target_drive 在 config.json 里是 "D"（不带冒号），展开成 Windows 盘符
+    # 必须带冒号 "D:"，否则 dest_base 会变成相对路径 "D\AppData\Local"，
+    # 被 robocopy 相对工作目录解析，数据错误落进 exe 同级 D\ 子文件夹。
     target_drive = cfg.get("target_drive", "D")
+    if not target_drive.endswith(":"):
+        target_drive = target_drive + ":"
     placeholders = dict(_PLACEHOLDERS)
     placeholders["{TARGET_DRIVE}"] = target_drive
 

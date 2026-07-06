@@ -43,6 +43,10 @@ def generate_admin_bat(
     """
     source_path = source_path.replace("/", "\\")
     dest_path = dest_path.replace("/", "\\")
+    # 防御：dest 必须是绝对路径（盘符开头），否则 bat 脚本会相对工作目录解析，
+    # 历史上 config 的 {TARGET_DRIVE} 不带冒号曾导致 dest 变成相对路径
+    if not os.path.isabs(dest_path):
+        dest_path = os.path.abspath(dest_path)
     result_file = str(_TOOL_DIR / f"_admin_result_{name}.txt")
 
     # 移除旧的结果文件

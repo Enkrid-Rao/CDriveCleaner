@@ -49,6 +49,9 @@ def scan_zone(zone_key: str, threshold_mb: int = 100) -> tuple[list[dict], list[
 
     # 注意：PowerShell 脚本中用 {{ }} 转义大括号（f-string 要求）
     no_go_items = ",".join(f"'{n}'" for n in no_go)
+    # PowerShell 路径分隔符：单个反斜杠。用变量插入 f-string 避免 \\ 产生双反斜杠
+    # （PowerShell 的 \ 不是转义符，\\ 会原样输出两个反斜杠，导致路径异常）
+    sep = "\\"
     script = f"""
     $SourcePath = '{source}'
     $DestBase = '{dest_base}'
@@ -76,7 +79,7 @@ def scan_zone(zone_key: str, threshold_mb: int = 100) -> tuple[list[dict], list[
             if ($null -eq $size) {{ $size = 0 }}
             $sizeMB = [math]::Round($size / 1MB, 2)
             if ($sizeMB -ge $Threshold) {{
-                "BIG|$($d.Name)|$sizeMB|$($d.FullName)|$DestBase\\$($d.Name)|{zone_key}"
+                "BIG|$($d.Name)|$sizeMB|$($d.FullName)|$DestBase{sep}$($d.Name)|{zone_key}"
             }}
         }}
     }}

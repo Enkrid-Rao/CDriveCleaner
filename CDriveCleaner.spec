@@ -23,6 +23,7 @@ a = Analysis(
         'PySide6.QtWidgets',
         'src.gui',
         'src.gui_styles',
+        'src.logger',
     ],
     hookspath=[],
     runtime_hooks=[],

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -104,8 +105,10 @@ def _delete_directory(source_path: str) -> bool:
         return True
 
     # robocopy /MIR 空目录方式清空
-    empty_dir = Path(__file__).resolve().parent / "_empty"
-    empty_dir.mkdir(exist_ok=True)
+    # 用系统 Temp 目录（一定存在且可写），不能用 __file__——
+    # 打包 onefile 后 __file__ 指向 PYZ 虚拟路径，磁盘不存在，mkdir 会炸
+    empty_dir = Path(tempfile.gettempdir()) / "_cdc_empty"
+    empty_dir.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         ["robocopy", str(empty_dir), source_path, "/MIR", "/r:1", "/w:1"],
         capture_output=True, timeout=60,

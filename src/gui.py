@@ -51,6 +51,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QScrollArea,
     QSizePolicy,
+    QTextEdit,
     QGraphicsDropShadowEffect,
     QGraphicsOpacityEffect,
     QMessageBox,
@@ -58,6 +59,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import gui_styles as gs
+from .logger import OperationLog, LEVEL_COLORS
 from .scanner import scan_all, get_drive_info
 from .migrator import migrate_dir, undo_junction, clean_temp
 from .admin_ops import (
@@ -685,6 +687,90 @@ class LoadingOverlay(QWidget):
 
 
 # ============================================================
+# 可折叠区 / 操作日志面板
+# ============================================================
+
+class CollapsibleBox(QFrame):
+    """通用可折叠容器：标题栏（点击折叠/展开）+ 内容控件。"""
+
+    def __init__(self, title: str, content: QWidget,
+                 parent: QWidget | None = None,
+                 extra: list[QWidget] | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("CollapsibleBox")
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        header = QPushButton()
+        header.setObjectName("CollapseHeader")
+        header.setMinimumHeight(42)
+        h = QHBoxLayout(header)
+        h.setContentsMargins(4, 2, 4, 2)
+        h.setSpacing(8)
+        self._arrow = QLabel("▼")
+        self._arrow.setObjectName("CollapseArrow")
+        h.addWidget(self._arrow)
+        t = QLabel(title)
+        t.setObjectName("SectionTitle")
+        h.addWidget(t)
+        for w in (extra or []):
+            h.addWidget(w)
+        h.addStretch()
+        header.clicked.connect(self._toggle)
+        outer.addWidget(header)
+
+        self._content = content
+        outer.addWidget(content)
+        self._collapsed = False
+
+    def _toggle(self) -> None:
+        self._collapsed = not self._collapsed
+        self._content.setVisible(not self._collapsed)
+        self._arrow.setText("▶" if self._collapsed else "▼")
+
+
+class LogPanel(CollapsibleBox):
+    """操作日志面板：彩色折叠日志，订阅 OperationLog 实时刷新。"""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        self.body = QTextEdit()
+        self.body.setObjectName("LogBody")
+        self.body.setReadOnly(True)
+        self.body.setMaximumHeight(200)
+
+        self._count = QLabel("")
+        self._count.setObjectName("SectionHint")
+        clear_btn = QPushButton("清空")
+        clear_btn.setObjectName("GhostBtn")
+        clear_btn.setCursor(Qt.PointingHandCursor)
+
+        super().__init__("操作日志", self.body, parent=parent,
+                         extra=[self._count, clear_btn])
+        self.setObjectName("LogPanel")
+        clear_btn.clicked.connect(self._clear)
+        OperationLog().subscribe(self._append)
+
+    @staticmethod
+    def _escape(text: str) -> str:
+        return (text.replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;"))
+
+    def _append(self, entry: dict[str, str]) -> None:
+        color = LEVEL_COLORS.get(entry["level"], gs.TEXT)
+        ts = entry["ts"]
+        msg = self._escape(entry["msg"])
+        self.body.append(f'<span style="color:{color}">[{ts}] {msg}</span>')
+        self._count.setText(str(OperationLog().count))
+
+    def _clear(self) -> None:
+        self.body.clear()
+        OperationLog().clear_memory()
+        self._count.setText("0")
+
+
+# ============================================================
 # 主窗口
 # ============================================================
 
@@ -706,6 +792,7 @@ class MainWindow(QMainWindow):
         self._workers: list[Any] = []
         self._scan_data: dict[str, Any] = {}
         self._toasts: list[Toast] = []
+        self.oplog = OperationLog()
 
         # 中央容器
         root = QWidget()
@@ -745,6 +832,9 @@ class MainWindow(QMainWindow):
 
         # 4. 扫描结果区
         self._build_results_section(body_layout)
+
+        # 5. 操作日志面板（可折叠，落盘）
+        self._build_log_panel(body_layout)
 
         body_layout.addStretch()
 
@@ -875,25 +965,16 @@ class MainWindow(QMainWindow):
         # 间隔
         parent_layout.addSpacing(16)
 
-        # ===== Section 2: 已迁移（Junction）=====
-        junction_title = QHBoxLayout()
-        junction_title.setSpacing(10)
-        self.junction_dot = QLabel("●")
-        self.junction_dot.setStyleSheet(f"color:{gs.TEAL};font-size:14px;")
-        junction_title.addWidget(self.junction_dot)
-        self.junction_title = QLabel("已迁移到 D 盘")
-        self.junction_title.setObjectName("SectionTitle")
-        junction_title.addWidget(self.junction_title)
-        self.junction_count = QLabel("")
-        self.junction_count.setObjectName("SectionHint")
-        junction_title.addWidget(self.junction_count)
-        junction_title.addStretch()
-        parent_layout.addLayout(junction_title)
+        # ===== Section 2: 已迁移（Junction）—— 可折叠 =====
+        junction_content = QWidget()
+        jc_layout = QVBoxLayout(junction_content)
+        jc_layout.setContentsMargins(0, 0, 0, 0)
+        jc_layout.setSpacing(8)
 
         # 已迁移容器
         self.junction_container = QVBoxLayout()
         self.junction_container.setSpacing(8)
-        parent_layout.addLayout(self.junction_container)
+        jc_layout.addLayout(self.junction_container)
 
         # 已迁移空状态
         self.junction_empty = QFrame()
@@ -911,12 +992,22 @@ class MainWindow(QMainWindow):
         je_layout.addWidget(je_tx)
         self.junction_empty.setFixedHeight(90)
         self.junction_empty.hide()  # 默认隐藏，扫描后按需显示
-        parent_layout.addWidget(self.junction_empty)
+        jc_layout.addWidget(self.junction_empty)
+
+        # 已迁移计数标签（传给 CollapsibleBox 的 extra）
+        self.junction_count = QLabel("")
+        self.junction_count.setObjectName("SectionHint")
+
+        self.junction_box = CollapsibleBox(
+            "已迁移到 D 盘", junction_content, extra=[self.junction_count]
+        )
+        parent_layout.addWidget(self.junction_box)
 
     # ---------- 业务逻辑 ----------
 
     def do_scan(self) -> None:
         """触发扫描。"""
+        self._log("INFO", "开始全面扫描所有区域...")
         if not self._workers:
             self._set_loading(True, "正在扫描 C 盘...")
 
@@ -940,6 +1031,12 @@ class MainWindow(QMainWindow):
         self._set_loading(False)
         self.btn_scan.setEnabled(True)
 
+        big = data.get("bigDirs", [])
+        junc = data.get("junctions", [])
+        self._log("SUCCESS", f"扫描完成: {len(big)} 个可迁移, {len(junc)} 个已迁移")
+        if data.get("tempSizeMB", 0) > 100:
+            self._log("WARN", f"Temp 缓存占用 {self._fmt_size(data.get('tempSizeMB', 0))}，建议清理")
+
         # 更新统计卡片（数值动画）
         self.card_c_free.set_value_animated(data.get("cFreeGB", 0), " GB", 1)
         self.card_d_free.set_value_animated(data.get("dFreeGB", 0), " GB", 1)
@@ -953,6 +1050,7 @@ class MainWindow(QMainWindow):
     def _on_scan_error(self, err: str) -> None:
         self._set_loading(False)
         self.btn_scan.setEnabled(True)
+        self._log("ERROR", f"扫描失败: {err}")
         self._show_toast(f"扫描失败: {err}", "error")
         self._clear_results()
         self._show_migrate_empty("扫描失败", "⚠️")
@@ -1023,6 +1121,15 @@ class MainWindow(QMainWindow):
         self.migrate_empty.show()
         # junction_empty 默认不显示，扫描后按需显示
 
+    def _build_log_panel(self, parent_layout: QVBoxLayout) -> None:
+        """构建操作日志面板（可折叠，订阅 OperationLog）。"""
+        self.log_panel = LogPanel()
+        parent_layout.addWidget(self.log_panel)
+
+    def _log(self, level: str, msg: str) -> None:
+        """记录一条操作日志（同时落盘 + 刷新面板）。"""
+        self.oplog.log(level, msg)
+
     def _show_migrate_empty(self, text: str, icon: str = "🔍") -> None:
         """显示可迁移区的空状态。"""
         self.migrate_empty.show()
@@ -1045,6 +1152,7 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
+        self._log("INFO", f"开始迁移: {name} ({self._fmt_size(size_mb)})")
         self._set_loading(True, f"正在迁移 {name}...")
         worker = MigrateWorker(source, dest, name)
         worker.finished.connect(lambda r: self._on_migrate_done(name, r))
@@ -1058,6 +1166,9 @@ class MainWindow(QMainWindow):
         if result.get("success"):
             target = result.get("target", "")
             self._show_toast(f"✓ {name} 迁移成功", "success")
+            self._log("SUCCESS", f"{name} 迁移成功 → {target}")
+            for s in result.get("steps", []):
+                self._log("INFO", f"  {s}")
             # 刷新磁盘信息
             if "cFreeGB" in result:
                 self.card_c_free.set_value_animated(result["cFreeGB"], " GB", 1)
@@ -1066,6 +1177,9 @@ class MainWindow(QMainWindow):
         else:
             err = result.get("error", "未知错误")
             self._show_toast(f"迁移失败: {err}", "error")
+            self._log("ERROR", f"{name} 迁移失败: {err}")
+            if result.get("needsAdmin"):
+                self._log("WARN", "需要管理员权限，请使用 🔑 Elevate 按钮")
 
     def _do_undo(self, source: str, name: str) -> None:
         """撤销迁移。"""
@@ -1078,6 +1192,7 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
+        self._log("INFO", f"开始撤销: {name}")
         self._set_loading(True, f"正在撤销 {name}...")
         worker = UndoWorker(source, name)
         worker.finished.connect(lambda r: self._on_undo_done(name, r))
@@ -1090,6 +1205,7 @@ class MainWindow(QMainWindow):
     def _on_undo_done(self, name: str, result: dict[str, Any]) -> None:
         if result.get("success"):
             self._show_toast(f"✓ {name} 已回迁到 C 盘", "success")
+            self._log("SUCCESS", f"{name} 撤销成功，数据已回迁到 C 盘 ({self._fmt_size(result.get('sizeMB', 0))})")
             if "cFreeGB" in result:
                 self.card_c_free.set_value_animated(result["cFreeGB"], " GB", 1)
                 self.card_d_free.set_value_animated(result["dFreeGB"], " GB", 1)
@@ -1097,6 +1213,7 @@ class MainWindow(QMainWindow):
         else:
             err = result.get("error", "未知错误")
             self._show_toast(f"撤销失败: {err}", "error")
+            self._log("ERROR", f"{name} 撤销失败: {err}")
 
     # ---------- 管理员操作 ----------
 
@@ -1112,6 +1229,7 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
+        self._log("INFO", f"请求管理员迁移: {name} ({self._fmt_size(size_mb)})")
         worker = AdminMigrateWorker(source, dest, name, size_mb)
         worker.finished.connect(self._on_admin_triggered)
         worker.error.connect(self._on_worker_error)
@@ -1132,6 +1250,7 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
+        self._log("INFO", f"请求管理员撤销: {name}")
         worker = AdminUndoWorker(source, name)
         worker.finished.connect(self._on_admin_triggered)
         worker.error.connect(self._on_worker_error)
@@ -1147,10 +1266,12 @@ class MainWindow(QMainWindow):
         if result.get("uacTriggered"):
             name = result.get("name", "")
             self._show_toast(f"UAC 已弹出，请在权限窗口点「是」", "info")
+            self._log("INFO", f"已请求 UAC 提权: {name}，请在权限窗口点「是」")
             # 提示用户检查结果
             self._show_admin_result_dialog(name, result.get("resultFile", ""))
         else:
             self._show_toast("UAC 触发失败，请手动以管理员运行脚本", "warn")
+            self._log("WARN", f"UAC 自动触发失败: {name}，请手动以管理员运行脚本")
 
     def _show_admin_result_dialog(self, name: str, result_file: str) -> None:
         """显示管理员操作结果查询对话框。"""
@@ -1174,14 +1295,17 @@ class MainWindow(QMainWindow):
         result = read_admin_result(name)
         if result.get("pending"):
             self._show_toast("脚本还在执行中，请稍后再查询", "warn")
+            self._log("WARN", f"{name} 管理员脚本还在执行中，请稍后再查询")
             return
         if result.get("success"):
             size_mb = result.get("sizeMB", 0)
             self._show_toast(f"✓ 管理员迁移成功！释放 {self._fmt_size(size_mb)}", "success")
+            self._log("SUCCESS", f"{name} 管理员操作成功！释放 {self._fmt_size(size_mb)}")
             QTimer.singleShot(800, self.do_scan)
         else:
             err = result.get("error", "执行失败")
             self._show_toast(f"管理员操作失败: {err}", "error")
+            self._log("ERROR", f"{name} 管理员操作失败: {err}")
 
     # ---------- Temp 清理 ----------
 
@@ -1195,6 +1319,7 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
+        self._log("INFO", "开始清理 Temp 目录（超过 1 天的临时文件）...")
         self._set_loading(True, "正在清理 Temp...")
         self.btn_clean_temp.setEnabled(False)
         worker = CleanTempWorker()
@@ -1208,6 +1333,7 @@ class MainWindow(QMainWindow):
     def _on_clean_temp_done(self, result: dict[str, Any]) -> None:
         cleaned = result.get("cleanedMB", 0)
         self._show_toast(f"✓ 已清理 Temp: {self._fmt_size(cleaned)}", "success")
+        self._log("SUCCESS", f"Temp 清理完成: 释放 {self._fmt_size(cleaned)}")
         if "cFreeGB" in result:
             self.card_c_free.set_value_animated(result["cFreeGB"], " GB", 1)
         self.card_temp.set_value_animated(0, " MB", 0)
@@ -1219,6 +1345,7 @@ class MainWindow(QMainWindow):
         self.btn_scan.setEnabled(True)
         self.btn_clean_temp.setEnabled(True)
         self._show_toast(f"操作出错: {err}", "error")
+        self._log("ERROR", f"操作出错: {err}")
 
     def _set_loading(self, on: bool, text: str = "") -> None:
         if on:
