@@ -1,10 +1,13 @@
 # CDriveCleaner v2
 
 <p align="center">
-  <img alt="version 2.0.0" src="https://img.shields.io/badge/version-2.0.0-6D5EF8?style=flat-square">
+  <a href="https://github.com/Enkrid-Rao/CDriveCleaner/releases/latest">
+    <img alt="GitHub release" src="https://img.shields.io/github/v/release/Enkrid-Rao/CDriveCleaner?style=flat-square&color=6D5EF8">
+  </a>
   <img alt="platform Windows 10/11" src="https://img.shields.io/badge/platform-Windows%2010%2F11-38BDF8?style=flat-square">
   <img alt="python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-FBBF24?style=flat-square">
   <img alt="license MIT" src="https://img.shields.io/badge/license-MIT-34D399?style=flat-square">
+  <img alt="downloads" src="https://img.shields.io/github/downloads/Enkrid-Rao/CDriveCleaner/total?style=flat-square&color=F472B6">
 </p>
 
 > **C 盘瘦身，冷数据归档。**
