@@ -708,6 +708,68 @@ def safe_delete_tree(
 
 
 # ============================================================
+# 清空目录内容（保留空目录骨架）
+# ============================================================
+
+def clear_tree_keep_structure(
+    root: str,
+    *,
+    cancel: Callable[[], bool] | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
+) -> DeleteReport:
+    """删除 root 下的所有文件，但保留 root 与空目录结构。
+
+    遇到 Junction / Symlink：只移除链接，并在原位置补一个普通空目录，
+    不触碰链接目标的数据。用于「移动归档后保留 Downloads\\Software 空壳」。
+    """
+    report = DeleteReport()
+    root = os.path.abspath(root)
+    if not os.path.isdir(root) or is_link(root):
+        report.ok = False
+        report.add("不是普通目录，无法清空")
+        return report
+    stack = [root]
+    counter = 0
+    while stack:
+        if cancel and cancel():
+            report.ok = False
+            report.add("已取消")
+            break
+        current = stack.pop()
+        try:
+            with os.scandir(current) as it:
+                for entry in it:
+                    try:
+                        if entry.is_junction() or entry.is_symlink():
+                            was_dir = entry.is_dir(follow_symlinks=False)
+                            if not remove_link(entry.path):
+                                report.ok = False
+                                report.add(f"无法移除链接: {entry.path}")
+                            elif was_dir:
+                                os.makedirs(entry.path, exist_ok=True)
+                            continue
+                        if entry.is_dir(follow_symlinks=False):
+                            stack.append(entry.path)
+                            continue
+                        st = entry.stat(follow_symlinks=False)
+                        _force_writable(entry.path)
+                        os.unlink(entry.path)
+                        report.files += 1
+                        report.bytes += int(st.st_size)
+                        counter += 1
+                        if on_progress and counter % 300 == 0:
+                            on_progress(report.files, report.bytes)
+                    except OSError as exc:
+                        report.ok = False
+                        report.add(f"{entry.path}: {exc}")
+        except OSError as exc:
+            report.ok = False
+            report.add(f"{current}: {exc}")
+    report.ok = report.ok and os.path.isdir(root)
+    return report
+
+
+# ============================================================
 # robocopy
 # ============================================================
 
@@ -770,8 +832,7 @@ def robocopy_copy(
                           duration_s=time.time() - started)
 
     last_poll = 0.0
-    last_bytes = 0
-    last_time = started
+    last_done = 0
     try:
         while proc.poll() is None:
             if cancel and cancel():
@@ -784,11 +845,11 @@ def robocopy_copy(
                 try:
                     done = directory_size(dest, cancel=lambda: False)
                 except Exception:
-                    done = last_bytes
-                dt = max(0.001, now - last_time)
-                speed = max(0.0, (done - last_bytes) / dt)
-                if speed > 0:
-                    last_bytes, last_time = done, now
+                    done = last_done
+                last_done = done
+                # 用复制全程平均速度，避免轮询间隙造成几 KB/s 的假象
+                elapsed = max(0.5, now - started)
+                speed = max(0.0, done / elapsed)
                 on_progress(done, total_bytes, speed)
             time.sleep(0.35)
         result.code = proc.wait()

@@ -372,11 +372,11 @@ class AppState(QObject):
         if action == ACTION_ARCHIVE:
             mode = items[0].mode if items else MODE_MOVE
             if mode == MODE_LINK:
-                sub = "复制 → 校验 → 删除源 → 建立链接"
+                sub = "复制 → 校验 → 清空源内容 → 建立链接"
             elif mode == "copy":
                 sub = "复制 → 校验，源目录保留"
             else:
-                sub = "复制 → 校验 → 删除源，冷数据移入机械盘"
+                sub = "复制 → 校验 → 清空源内容（保留目录结构），冷数据移入机械盘"
             return (f"正在归档 {count} 个目录", sub,
                     ["准备", "复制", "校验", "完成"], "archive")
         if action == ACTION_UNDO:

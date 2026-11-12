@@ -461,15 +461,8 @@ def analyze_cold(
             entry.name, stats, size_min_bytes=min_size, source_drive=drive)
         if tier == TIER_SKIP and stats.bytes < min_size:
             continue
-        # 目标路径：archive_root\C\Users\me\Downloads
-        try:
-            drive_root = drive + ":\\"
-            rel = os.path.relpath(entry.path, drive_root)
-            if rel.startswith(".."):
-                rel = entry.name
-        except (ValueError, OSError):
-            rel = entry.name
-        dest = os.path.join(config.archive_root, drive, rel)
+        # 归档目标：所有选中目录都以「目录名」同级放到目标路径下
+        dest = os.path.join(config.archive_root, entry.name)
         cand = ArchiveCandidate(
             name=entry.name,
             path=entry.path,
@@ -538,13 +531,7 @@ def analyze_cold(
             entry.name, stats, size_min_bytes=min_size, source_drive=drive)
         if tier == TIER_SKIP and stats.bytes < min_size:
             continue
-        try:
-            rel = os.path.relpath(entry.path, drive + ":\\")
-            if rel.startswith(".."):
-                rel = entry.name
-        except (ValueError, OSError):
-            rel = entry.name
-        dest = os.path.join(config.archive_root, drive, rel)
+        dest = os.path.join(config.archive_root, entry.name)
         cand = ArchiveCandidate(
             name=entry.name,
             path=entry.path,

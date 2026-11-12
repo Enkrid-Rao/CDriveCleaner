@@ -140,7 +140,7 @@ class Pill(QLabel):
         self.setStyleSheet(
             f"QLabel#Pill {{ color:{color}; background:{bg}; "
             f"border:1px solid {border}; border-radius:8px; "
-            f"padding:2px 8px; font-size:10px; font-weight:700; }}"
+            f"padding:3px 9px; font-size:12px; font-weight:600; }}"
         )
 
     def set_text(self, text: str) -> None:
@@ -194,15 +194,16 @@ class Check(QAbstractButton):
         if self.isChecked():
             grad = QLinearGradient(box.topLeft(), box.bottomRight())
             grad.setColorAt(0, QColor(theme.BRAND))
-            grad.setColorAt(1, QColor(theme.BRAND_2))
+            grad.setColorAt(1, QColor("#C25B3B"))
             p.setBrush(QBrush(grad))
-            p.setPen(QPen(QColor(255, 255, 255, 40), 1))
+            p.setPen(QPen(QColor("#9C3E27"), 1))
         else:
-            p.setBrush(QColor(10, 16, 28, 230))
-            p.setPen(QPen(QColor(255, 255, 255, 40 + int(40 * self._hover)), 1))
+            p.setBrush(QColor(theme.INPUT))
+            p.setPen(QPen(QColor(theme.BORDER_STRONG if self._hover > 0.4
+                                 else theme.BORDER_HI), 1))
         p.drawRoundedRect(box, 5.5, 5.5)
         if self.isChecked():
-            pen = QPen(QColor(255, 255, 255), 2.0)
+            pen = QPen(QColor("#FFF8F0"), 2.0)
             pen.setCapStyle(Qt.RoundCap)
             pen.setJoinStyle(Qt.RoundJoin)
             p.setPen(pen)
@@ -241,14 +242,20 @@ class IconTile(QWidget):
     def paintEvent(self, event: QPaintEvent) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
+        tone = theme.tone_color(self._tone)
         rect = QRectF(0, 0, self.width(), self.height())
-        p.setPen(QPen(QColor(255, 255, 255, 18), 1))
-        p.setBrush(QColor(theme.tone_color(self._tone)))
-        p.setOpacity(0.13)
+        p.setPen(QPen(QColor(theme.tone_color(self._tone)).darker(105), 1))
+        bg = QColor(theme.SURFACE_3)
+        tint = QColor(tone)
+        bg = QColor(
+            int(bg.red() * 0.86 + tint.red() * 0.14),
+            int(bg.green() * 0.86 + tint.green() * 0.14),
+            int(bg.blue() * 0.86 + tint.blue() * 0.14),
+        )
+        p.setBrush(bg)
         p.drawRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), 10, 10)
-        p.setOpacity(1.0)
-        pix = icons.icon_pixmap(self._icon, theme.tone_color(self._tone),
-                                self._icon_size)
+        pix = icons.icon_pixmap(self._icon, theme.TEXT_2, self._icon_size,
+                                accent=tone)
         target = QRectF((self.width() - self._icon_size) / 2,
                         (self.height() - self._icon_size) / 2,
                         self._icon_size, self._icon_size)
@@ -362,9 +369,10 @@ class SearchField(QLineEdit):
         self.addAction(icons.icon("search", theme.MUT, 15),
                        QLineEdit.LeadingPosition)
         self.setStyleSheet(
-            f"QLineEdit {{ background:{theme.INPUT}; border:1px solid {theme.BORDER_HI}; "
-            f"border-radius:10px; padding:7px 10px 7px 4px; color:{theme.TEXT}; }}"
-            f"QLineEdit:focus {{ border:1px solid rgba(109,94,248,0.7); }}"
+            f"QLineEdit {{ background:{theme.INPUT}; border:1px solid #D8CFBE; "
+            f"border-radius:10px; padding:8px 10px 8px 4px; color:{theme.TEXT}; "
+            f"font-size:13px; }}"
+            f"QLineEdit:focus {{ border:1px solid {theme.BRAND}; }}"
         )
 
 
@@ -450,17 +458,17 @@ class Toggle(QAbstractButton):
         if self.isChecked():
             grad = QLinearGradient(track.topLeft(), track.topRight())
             grad.setColorAt(0, QColor(theme.BRAND))
-            grad.setColorAt(1, QColor(theme.BRAND_2))
+            grad.setColorAt(1, QColor("#C25B3B"))
             p.setBrush(QBrush(grad))
             p.setPen(Qt.NoPen)
         else:
-            p.setBrush(QColor(255, 255, 255, 22))
-            p.setPen(QPen(QColor(255, 255, 255, 28), 1))
+            p.setBrush(QColor("#E2D8C7"))
+            p.setPen(QPen(QColor("#CFC4B1"), 1))
         p.drawRoundedRect(track, track.height() / 2, track.height() / 2)
         x = track.left() + 3 + self._pos * (track.width() - track.height())
         knob = QRectF(x, track.top() + 2, track.height() - 4, track.height() - 4)
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor(255, 255, 255))
+        p.setBrush(QColor("#FFFDF8"))
         p.drawEllipse(knob)
         p.end()
 
@@ -549,13 +557,14 @@ class UsageBar(QWidget):
     def _colors(self) -> tuple[QColor, QColor]:
         tone = self._tone
         if tone == "c":
-            return QColor(theme.GREEN), QColor(theme.ROSE) if self._value > 0.82 else QColor(theme.AMBER)
+            end = theme.BRAND if self._value > 0.82 else theme.AMBER
+            return QColor(theme.D_COLOR), QColor(end)
         if tone == "d":
-            return QColor(theme.BRAND_3), QColor(theme.BRAND_2)
+            return QColor("#8C6A43"), QColor("#B08A5A")
         if tone == "e":
-            return QColor(theme.TEAL), QColor(theme.CYAN)
+            return QColor(theme.TEAL), QColor("#5E8C86")
         if tone == "green":
-            return QColor(theme.GREEN), QColor(theme.TEAL)
+            return QColor(theme.GREEN), QColor("#7A8C5D")
         if tone == "amber":
             return QColor(theme.AMBER), QColor(theme.ORANGE)
         return QColor(theme.BRAND), QColor(theme.BRAND_2)
@@ -566,7 +575,7 @@ class UsageBar(QWidget):
         rect = QRectF(0, 0, self.width(), self.height())
         radius = self.height() / 2
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor(255, 255, 255, 20))
+        p.setBrush(QColor(228, 218, 202))
         p.drawRoundedRect(rect, radius, radius)
         if self._value <= 0.001:
             return
@@ -625,7 +634,7 @@ class Gauge(QWidget):
         start = 225 * 16
         span = 270 * 16
         # 轨道
-        pen = QPen(QColor(255, 255, 255, 20), 11)
+        pen = QPen(QColor(229, 220, 204), 11)
         pen.setCapStyle(Qt.RoundCap)
         p.setPen(pen)
         p.drawArc(rect, start, span)
@@ -645,19 +654,19 @@ class Gauge(QWidget):
             cx = rect.center().x() + (rect.width() / 2) * math.cos(angle)
             cy = rect.center().y() - (rect.height() / 2) * math.sin(angle)
             p.setPen(Qt.NoPen)
-            p.setBrush(QColor(255, 255, 255, 30))
+            p.setBrush(QColor(180, 74, 45, 30))
             p.drawEllipse(QRectF(cx - 8, cy - 8, 16, 16))
         # 中心文字
         p.setPen(QColor(theme.TEXT))
-        font = QFont("JetBrains Mono", 24)
+        font = QFont("Cascadia Mono", 24)
         font.setBold(True)
         p.setFont(font)
         p.drawText(QRectF(0, side * 0.30, side, side * 0.26),
                    Qt.AlignCenter, self._top)
         p.setPen(QColor(theme.MUT))
-        font2 = QFont("Microsoft YaHei UI", 9)
+        font2 = QFont("Microsoft YaHei UI", 12)
         p.setFont(font2)
-        p.drawText(QRectF(0, side * 0.53, side, 22),
+        p.drawText(QRectF(0, side * 0.53, side, 24),
                    Qt.AlignCenter, self._caption)
         p.end()
 
@@ -724,22 +733,22 @@ class DriveCard(QFrame):
         badge.setStyleSheet(
             f"background:{theme.TONE_BG.get(tone, theme.TONE_BG['brand'])};"
             f"color:{color};border:1px solid {theme.TONE_BORDER.get(tone, theme.BORDER_HI)};"
-            "border-radius:9px;font-family:'JetBrains Mono';font-size:14px;font-weight:800;"
+            "border-radius:9px;font-family:'Cascadia Mono';font-size:14px;font-weight:800;"
         )
         top.addWidget(badge)
         name_box = QVBoxLayout()
         name_box.setSpacing(0)
         name = QLabel(drive.label or f"{drive.letter} 盘")
-        name.setStyleSheet(f"color:{theme.TEXT};font-size:12px;font-weight:700;")
+        name.setStyleSheet(f"color:{theme.TEXT};font-size:13px;font-weight:700;")
         media = QLabel(drive.media_label)
-        media.setStyleSheet(f"color:{theme.DIM};font-size:9px;")
+        media.setStyleSheet(f"color:{theme.DIM};font-size:12px;")
         name_box.addWidget(name)
         name_box.addWidget(media)
         top.addLayout(name_box)
         top.addStretch()
         pct = QLabel(f"{int(round(drive.used_ratio * 100))}%")
         pct.setStyleSheet(
-            f"color:{color};font-family:'JetBrains Mono';font-size:12px;font-weight:700;"
+            f"color:{color};font-family:'Cascadia Mono';font-size:13px;font-weight:700;"
         )
         top.addWidget(pct)
         self.check_badge = QLabel()
@@ -753,13 +762,13 @@ class DriveCard(QFrame):
         total_gb = drive.total_bytes / 1024 ** 3
         self.free_label = QLabel(f"{free_gb:.1f} GB")
         self.free_label.setStyleSheet(
-            f"color:{theme.TEXT};font-family:'JetBrains Mono';font-size:18px;font-weight:700;"
+            f"color:{theme.TEXT};font-family:'Cascadia Mono';font-size:18px;font-weight:700;"
         )
         layout.addWidget(self.free_label)
         self.bar = UsageBar(drive.used_ratio, tone, 7)
         layout.addWidget(self.bar)
         self.caption = QLabel(f"可用 · 总容量 {total_gb:.0f} GB")
-        self.caption.setStyleSheet(f"color:{theme.DIM};font-size:9px;")
+        self.caption.setStyleSheet(f"color:{theme.DIM};font-size:12px;")
         layout.addWidget(self.caption)
         self.setToolTip(f"{drive.root}\n{drive.model or drive.media_label}")
 
@@ -791,30 +800,30 @@ class DriveMiniCard(QFrame):
         top.setSpacing(6)
         self.letter = QLabel("C")
         self.letter.setStyleSheet(
-            f"color:{theme.ROSE};font-family:'JetBrains Mono';font-size:11px;"
-            "font-weight:800;background:rgba(251,113,133,0.12);"
-            "border:1px solid rgba(251,113,133,0.25);border-radius:6px;padding:1px 6px;"
+            f"color:{theme.BRAND};font-family:'Cascadia Mono';font-size:12px;"
+            "font-weight:700;background:rgba(180,74,45,0.10);"
+            "border:1px solid rgba(180,74,45,0.24);border-radius:6px;padding:1px 6px;"
         )
         top.addWidget(self.letter)
         self.title = QLabel("系统盘")
-        self.title.setStyleSheet(f"color:{theme.MUT};font-size:10px;")
+        self.title.setStyleSheet(f"color:{theme.MUT};font-size:12px;")
         top.addWidget(self.title)
         top.addStretch()
         self.pct = QLabel("—")
         self.pct.setStyleSheet(
-            f"color:{theme.TEXT_2};font-family:'JetBrains Mono';font-size:10px;font-weight:700;"
+            f"color:{theme.TEXT_2};font-family:'Cascadia Mono';font-size:12px;font-weight:700;"
         )
         top.addWidget(self.pct)
         layout.addLayout(top)
         self.free = QLabel("—")
         self.free.setStyleSheet(
-            f"color:{theme.TEXT};font-family:'JetBrains Mono';font-size:15px;font-weight:700;"
+            f"color:{theme.TEXT};font-family:'Cascadia Mono';font-size:17px;font-weight:700;"
         )
         layout.addWidget(self.free)
         self.bar = UsageBar(0, "c", 5)
         layout.addWidget(self.bar)
         self.caption = QLabel("可用空间")
-        self.caption.setStyleSheet(f"color:{theme.DIM};font-size:9px;")
+        self.caption.setStyleSheet(f"color:{theme.DIM};font-size:12px;")
         layout.addWidget(self.caption)
 
     def update_drive(self, drive: Any) -> None:
@@ -890,24 +899,25 @@ class NavButton(QAbstractButton):
         rect = QRectF(0, 1, self.width(), self.height() - 2)
         if self._active:
             grad = QLinearGradient(rect.topLeft(), rect.topRight())
-            grad.setColorAt(0, QColor(109, 94, 248, 58))
-            grad.setColorAt(1, QColor(56, 189, 248, 10))
+            grad.setColorAt(0, QColor(180, 74, 45, 58))
+            grad.setColorAt(1, QColor(180, 74, 45, 6))
             p.setBrush(QBrush(grad))
-            p.setPen(QPen(QColor(124, 108, 255, 70), 1))
+            p.setPen(QPen(QColor(217, 119, 87, 78), 1))
             p.drawRoundedRect(rect, 10, 10)
             p.setPen(Qt.NoPen)
             p.setBrush(QColor(theme.BRAND_2))
             p.drawRoundedRect(QRectF(0, self.height() / 2 - 9, 3, 18), 1.5, 1.5)
         elif self._hover > 0.01:
-            p.setBrush(QColor(255, 255, 255, int(12 * self._hover)))
+            p.setBrush(QColor(247, 240, 228, int(15 * self._hover)))
             p.setPen(Qt.NoPen)
             p.drawRoundedRect(rect, 10, 10)
-        color = theme.TEXT if self._active else (
-            theme.TEXT_2 if self._hover > 0.4 else theme.MUT)
-        pix = icons.icon_pixmap(self.icon_name, color, 18)
+        color = "#F7F0E4" if self._active else (
+            "#E7DDCC" if self._hover > 0.4 else "#B3A99A")
+        accent = theme.BRAND_2 if self._active else "#8F8575"
+        pix = icons.icon_pixmap(self.icon_name, color, 18, accent=accent)
         p.drawPixmap(QRectF(14, (self.height() - 18) / 2, 18, 18).toRect(), pix)
-        font = QFont("Microsoft YaHei UI", 11)
-        font.setWeight(QFont.Medium if self._active else QFont.Normal)
+        font = QFont("Microsoft YaHei UI", 13)
+        font.setWeight(QFont.DemiBold if self._active else QFont.Normal)
         p.setFont(font)
         p.setPen(QColor(color))
         p.drawText(QRectF(44, 0, self.width() - 50, self.height()),
@@ -971,7 +981,7 @@ class Sidebar(QFrame):
         from ..version import __version__
         version = QLabel(f"v{__version__}  ·  MIT License")
         version.setAlignment(Qt.AlignCenter)
-        version.setStyleSheet(f"color:{theme.DIM};font-size:9px;")
+        version.setStyleSheet("color:#8F8575;font-size:12px;")
         layout.addWidget(version)
 
     @staticmethod
@@ -1014,14 +1024,14 @@ class Toast(QFrame):
         }
         color, icon_name = colors.get(kind, colors["info"])
         self.setStyleSheet(
-            f"QFrame#Toast {{ background:#131C2D; border:1px solid {color}; "
-            "border-radius:12px; }"
+            f"QFrame#Toast {{ background:#FFFCF6; border:1px solid {theme.BORDER_HI}; "
+            f"border-left:4px solid {color}; border-radius:12px; }}"
         )
         layout = QHBoxLayout(self)
         layout.setContentsMargins(14, 11, 16, 11)
         layout.setSpacing(10)
         ic = QLabel()
-        ic.setPixmap(icons.icon_pixmap(icon_name, color, 17))
+        ic.setPixmap(icons.icon_pixmap(icon_name, color, 18, accent=color))
         ic.setFixedSize(18, 18)
         layout.addWidget(ic)
         tx = QLabel(text)
@@ -1031,6 +1041,7 @@ class Toast(QFrame):
         width = max(360, min(620, metrics.horizontalAdvance(text) + 92))
         self.setFixedWidth(width)
         tx.setMaximumWidth(width - 62)
+        tx.setStyleSheet(f"color:{theme.TEXT};font-size:13px;font-weight:600;")
         layout.addWidget(tx)
         self.adjustSize()
 
@@ -1107,33 +1118,33 @@ class Stepper(QWidget):
         step = width / max(1, n - 1) if n > 1 else 0
         centers = [margin + i * step for i in range(n)]
         y = 13
-        p.setPen(QPen(QColor(255, 255, 255, 28), 2))
+        p.setPen(QPen(QColor("#DDD3C1"), 2))
         p.drawLine(int(centers[0]), y, int(centers[-1]), y)
         if self.current > 0:
-            p.setPen(QPen(QColor(theme.BRAND_2), 2))
+            p.setPen(QPen(QColor(theme.BRAND), 2))
             p.drawLine(int(centers[0]), y, int(centers[self.current]), y)
         for i, (cx, text) in enumerate(zip(centers, self.steps)):
             if i < self.current:
-                color = QColor(theme.BRAND_2)
-                filled = True
-            elif i == self.current:
                 color = QColor(theme.BRAND)
                 filled = True
+            elif i == self.current:
+                color = QColor("#C25B3B")
+                filled = True
             else:
-                color = QColor(255, 255, 255, 34)
+                color = QColor("#D3C8B6")
                 filled = False
             p.setPen(QPen(color, 2))
-            p.setBrush(color if filled else QColor(13, 20, 34))
+            p.setBrush(color if filled else QColor(theme.SURFACE))
             p.drawEllipse(QRectF(cx - 7, y - 7, 14, 14))
             if i < self.current:
-                p.setPen(QPen(QColor(255, 255, 255), 1.8))
+                p.setPen(QPen(QColor("#FFF8F0"), 1.8))
                 p.drawLine(int(cx - 3), int(y), int(cx - 1), int(y + 3))
                 p.drawLine(int(cx - 1), int(y + 3), int(cx + 4), int(y - 4))
-            p.setPen(QColor(theme.TEXT if i <= self.current else theme.DIM))
-            font = QFont("Microsoft YaHei UI", 9)
+            p.setPen(QColor(theme.TEXT if i <= self.current else theme.MUT))
+            font = QFont("Microsoft YaHei UI", 12)
             font.setWeight(QFont.DemiBold if i == self.current else QFont.Normal)
             p.setFont(font)
-            p.drawText(QRectF(cx - 50, y + 12, 100, 18),
+            p.drawText(QRectF(cx - 50, y + 12, 100, 20),
                        Qt.AlignHCenter | Qt.AlignTop, text)
         p.end()
 
@@ -1151,7 +1162,7 @@ class ProgressOverlay(QWidget):
         self.card = QFrame()
         self.card.setObjectName("ProgressCard")
         self.card.setFixedWidth(640)
-        add_shadow(self.card, 48, 18, 150)
+        add_shadow(self.card, 44, 16, 80)
         outer.addWidget(self.card)
 
         layout = QVBoxLayout(self.card)
@@ -1186,31 +1197,36 @@ class ProgressOverlay(QWidget):
         percent_row = QHBoxLayout()
         self.percent = label("0%", "ValueSmall")
         self.percent.setStyleSheet(
-            f"color:{theme.BRAND_2};font-family:'JetBrains Mono';"
-            "font-size:20px;font-weight:700;"
+            f"color:{theme.BRAND};font-family:'Cascadia Mono';"
+            "font-size:22px;font-weight:700;"
         )
         percent_row.addWidget(self.percent)
         percent_row.addStretch()
         self.bytes_label = label("—", "MonoMuted")
+        self.bytes_label.setStyleSheet(
+            f"color:{theme.MUT};font-family:'Cascadia Mono';font-size:12px;")
         percent_row.addWidget(self.bytes_label)
         layout.addLayout(percent_row)
 
         stats = QHBoxLayout()
         stats.setSpacing(22)
-        self.speed_label = label("速度 —", "MonoMuted")
+        self.speed_label = label("平均速度 —", "MonoMuted")
         self.eta_label = label("剩余 —", "MonoMuted")
         self.phase_label = label("阶段 —", "MonoMuted")
-        stats.addWidget(self.speed_label)
-        stats.addWidget(self.eta_label)
-        stats.addWidget(self.phase_label)
+        for stat in (self.speed_label, self.eta_label, self.phase_label):
+            stat.setStyleSheet(
+                f"color:{theme.MUT};font-family:'Cascadia Mono';font-size:12px;")
+            stats.addWidget(stat)
         stats.addStretch()
         layout.addLayout(stats)
 
         self.detail = ElidedLabel("", "Dim")
+        self.detail.setStyleSheet(f"color:{theme.MUT};font-size:12px;")
         layout.addWidget(self.detail)
 
         footer = QHBoxLayout()
         self.hint = label("操作过程中请不要移动或关闭源目录。", "Dim")
+        self.hint.setStyleSheet(f"color:{theme.MUT};font-size:12px;")
         footer.addWidget(self.hint)
         footer.addStretch()
         self.cancel_btn = QPushButton("取消操作")
@@ -1237,7 +1253,7 @@ class ProgressOverlay(QWidget):
         self.bar.setValue(0)
         self.percent.setText("0%")
         self.bytes_label.setText("—")
-        self.speed_label.setText("速度 —")
+        self.speed_label.setText("平均速度 —")
         self.eta_label.setText("剩余 —")
         self.phase_label.setText("阶段 准备")
         self.detail.set_full_text("")
@@ -1261,7 +1277,7 @@ class ProgressOverlay(QWidget):
 
     def paintEvent(self, event: QPaintEvent) -> None:
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor(4, 7, 13, 205))
+        p.fillRect(self.rect(), QColor(37, 35, 30, 155))
         p.end()
 
     def update_progress(self, progress: Any) -> None:
@@ -1291,7 +1307,7 @@ class ProgressOverlay(QWidget):
             self.bytes_label.setText("—")
         speed = float(getattr(progress, "speed_bps", 0) or 0)
         if speed > 0:
-            self.speed_label.setText(f"速度 {human_bytes(speed)}/s")
+            self.speed_label.setText(f"平均 {human_bytes(speed)}/s")
         eta = float(getattr(progress, "eta_s", 0) or 0)
         if eta > 0:
             self.eta_label.setText(f"剩余 {human_duration(eta)}")
@@ -1331,24 +1347,24 @@ class ConfirmDialog(QDialog):
         card = QFrame()
         card.setObjectName("DialogInner")
         card.setStyleSheet(
-            f"QFrame#DialogInner {{ background:#0C1321; border:1px solid {theme.BORDER_HI}; "
+            f"QFrame#DialogInner {{ background:{theme.SURFACE}; border:1px solid {theme.BORDER_HI}; "
             "border-radius:18px; }"
         )
-        card.setFixedWidth(580)
-        add_shadow(card, 46, 16, 160)
+        card.setFixedWidth(600)
+        add_shadow(card, 40, 14, 70)
         outer.addWidget(card)
 
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(24, 22, 24, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(26, 24, 26, 22)
+        layout.setSpacing(15)
 
         head = QHBoxLayout()
         head.setSpacing(12)
-        head.addWidget(IconTile(icon_name, tone, 42, 20), alignment=Qt.AlignTop)
+        head.addWidget(IconTile(icon_name, tone, 44, 21), alignment=Qt.AlignTop)
         text_box = QVBoxLayout()
         text_box.setSpacing(4)
         t = label(title, "CardTitle")
-        t.setStyleSheet(f"color:{theme.TEXT};font-size:17px;font-weight:800;")
+        t.setStyleSheet(f"color:{theme.TEXT};font-size:18px;font-weight:700;")
         text_box.addWidget(t)
         text_box.addWidget(label(message, "Muted", wrap=True))
         head.addLayout(text_box, 1)
@@ -1466,11 +1482,11 @@ class InfoDialog(QDialog):
         card = QFrame()
         card.setObjectName("DialogInner")
         card.setStyleSheet(
-            f"QFrame#DialogInner {{ background:#0C1321; border:1px solid {theme.BORDER_HI}; "
+            f"QFrame#DialogInner {{ background:{theme.SURFACE}; border:1px solid {theme.BORDER_HI}; "
             "border-radius:18px; }"
         )
         card.setFixedSize(720, 520)
-        add_shadow(card, 46, 16, 160)
+        add_shadow(card, 40, 14, 70)
         outer.addWidget(card)
         layout = QVBoxLayout(card)
         layout.setContentsMargins(22, 20, 22, 18)

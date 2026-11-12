@@ -63,6 +63,22 @@ class WindowsTests(unittest.TestCase):
         self.assertEqual(stats.bytes, 1024)
         self.assertEqual(stats.links, 1)
 
+    def test_clear_keep_structure(self):
+        root = self.d / "keep"
+        (root / "a" / "b").mkdir(parents=True)
+        (root / "top.txt").write_text("top")
+        (root / "a" / "b" / "deep.bin").write_bytes(b"1" * 1024)
+        target = self.d / "keep_target"
+        target.mkdir()
+        (target / "safe.txt").write_text("safe")
+        windows.create_junction(str(root / "a" / "linked"), str(target))
+        report = windows.clear_tree_keep_structure(str(root))
+        self.assertTrue(report.ok, report.errors)
+        self.assertTrue((root / "a" / "b").is_dir())
+        self.assertTrue((root / "a" / "linked").is_dir())
+        self.assertEqual(list((root / "a" / "b").iterdir()), [])
+        self.assertTrue((target / "safe.txt").exists())
+
     def test_restart_manager_detects_lock(self):
         target = self.d / "locked"
         target.mkdir()

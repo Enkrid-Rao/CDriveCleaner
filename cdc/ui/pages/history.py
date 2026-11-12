@@ -58,7 +58,7 @@ class HistoryRow(QFrame):
         center.addWidget(source)
         if record.dest:
             dest = ElidedLabel(f"→  {record.dest}", "Mono")
-            dest.setStyleSheet(f"color:{theme.DIM};font-size:10px;")
+            dest.setStyleSheet(f"color:{theme.DIM};font-size:12px;")
             center.addWidget(dest)
         meta = QLabel(
             f"{fmt_time(record.ts, short=False)}  ·  {fmt_size(record.bytes_moved)}"
@@ -66,11 +66,11 @@ class HistoryRow(QFrame):
             + (f"  ·  {record.mode_label}"
                if record.action in (ACTION_ARCHIVE, ACTION_RESTORE) else "")
         )
-        meta.setStyleSheet(f"color:{theme.DIM};font-size:10px;")
+        meta.setStyleSheet(f"color:{theme.DIM};font-size:12px;")
         center.addWidget(meta)
         if record.error:
             error = QLabel(record.error)
-            error.setStyleSheet(f"color:{theme.RED};font-size:10px;")
+            error.setStyleSheet(f"color:{theme.RED};font-size:12px;")
             error.setWordWrap(True)
             center.addWidget(error)
         layout.addLayout(center, 1)
@@ -108,6 +108,9 @@ class HistoryRow(QFrame):
                 return ""
             if os.path.isdir(r.dest):
                 if not os.path.exists(r.source) or windows.is_junction(r.source):
+                    return "回迁"
+                if os.path.isdir(r.source) and \
+                        windows.directory_stats(r.source, collect_ext=False).files == 0:
                     return "回迁"
         return ""
 

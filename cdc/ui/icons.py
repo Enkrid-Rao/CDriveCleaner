@@ -1,4 +1,8 @@
-"""矢量图标与品牌 Logo（全部代码绘制，无外部图片依赖）。"""
+"""新版图标系统：墨线 + 单点实色（duotone seal）几何图标。
+
+统一 24×24 网格、1.8px 圆头描边；每个主图标只保留一个实色点缀，
+与暖纸张 / 墨色 / 赭红的界面层级一致。
+"""
 
 from __future__ import annotations
 
@@ -13,117 +17,242 @@ from PySide6.QtSvg import QSvgRenderer
 from . import theme
 
 _PATHS: dict[str, str] = {
-    "dashboard": ('<rect x="3" y="3" width="7" height="9" rx="1.5"/>'
-                  '<rect x="14" y="3" width="7" height="5" rx="1.5"/>'
-                  '<rect x="14" y="12" width="7" height="9" rx="1.5"/>'
-                  '<rect x="3" y="16" width="7" height="5" rx="1.5"/>'),
-    "sparkles": ('<path d="m12 3-1.9 5.8L4 10.7l6.1 1.9L12 18l1.9-5.4L20 10.7l-6.1-1.9z"/>'
-                 '<path d="M5 3v4M3 5h4M19 17v4M17 19h4"/>'),
-    "archive": ('<rect x="3" y="3" width="18" height="5" rx="1.5"/>'
-                '<path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/>'
-                '<path d="M10 12h4"/>'),
-    "link": ('<path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4.93"/>'
-             '<path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 19.07"/>'),
-    "history": ('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>'
-                '<path d="M12 7v5l3 2"/>'),
-    "settings": ('<circle cx="12" cy="12" r="3"/>'
-                 '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
-    "home": ('<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
-             '<path d="M9 22V12h6v10"/>'),
-    "folder": ('<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>'),
-    "package": ('<path d="m7.5 4.27 9 5.15"/>'
-                '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>'
-                '<path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>'),
-    "database": ('<ellipse cx="12" cy="5" rx="9" ry="3"/>'
-                 '<path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>'),
-    "refresh": ('<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>'
-                '<path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>'
-                '<path d="M16 16h5v5"/>'),
-    "layers": ('<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/>'
-               '<path d="m22 12.18-9.17 4.16a2 2 0 0 1-1.66 0L2 12.18"/>'
-               '<path d="m22 17.18-9.17 4.16a2 2 0 0 1-1.66 0L2 17.18"/>'),
-    "briefcase": ('<rect x="2" y="7" width="20" height="14" rx="2"/>'
-                  '<path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>'),
-    "drive": ('<line x1="22" y1="12" x2="2" y2="12"/>'
-              '<path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>'
-              '<line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/>'),
-    "shield": ('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>'),
-    "search": ('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>'),
-    "play": ('<polygon points="6 3 20 12 6 21 6 3"/>'),
-    "pause": ('<rect x="6" y="4" width="4" height="16" rx="1"/>'
-              '<rect x="14" y="4" width="4" height="16" rx="1"/>'),
-    "check": '<path d="M20 6 9 17l-5-5"/>',
-    "x": '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-    "alert": ('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>'
-              '<path d="M12 9v4"/><path d="M12 17h.01"/>'),
-    "trash": ('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>'
-              '<path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'),
-    "external": ('<path d="M15 3h6v6"/><path d="M10 14 21 3"/>'
-                 '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'),
-    "arrow-right": '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+    "dashboard": (
+        '<rect x="3" y="3" width="7.5" height="7.5" rx="2"/>'
+        '<rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/>'
+        '<rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/>'
+        '<rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" fill="{a}" stroke="none"/>'
+    ),
+    "grid": (
+        '<circle cx="5" cy="5" r="1.6"/><circle cx="12" cy="5" r="1.6"/>'
+        '<circle cx="19" cy="5" r="1.6"/><circle cx="5" cy="12" r="1.6"/>'
+        '<circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'
+        '<circle cx="5" cy="19" r="1.6"/><circle cx="12" cy="19" r="1.6"/>'
+        '<circle cx="19" cy="19" r="1.6" fill="{a}" stroke="none"/>'
+    ),
+    "sparkles": (
+        '<path d="M3.5 7A2.5 2.5 0 0 1 6 4.5h3l2 2.5h7A2.5 2.5 0 0 1 20.5 9.5v7A2.5 2.5 0 0 1 18 19H6a2.5 2.5 0 0 1-2.5-2.5z"/>'
+        '<path d="M12 10v5"/><path d="m9.4 12.6 2.6 2.6 2.6-2.6"/>'
+        '<circle cx="12" cy="18" r="1.2" fill="{a}" stroke="none"/>'
+    ),
+    "archive": (
+        '<rect x="3" y="4" width="18" height="5" rx="1.5"/>'
+        '<path d="M5 9v8.5A2.5 2.5 0 0 0 7.5 20h9a2.5 2.5 0 0 0 2.5-2.5V9"/>'
+        '<rect x="10" y="12.5" width="4" height="2.6" rx="1.3" fill="{a}" stroke="none"/>'
+    ),
+    "link": (
+        '<path d="M9.5 14.5 7.8 16.2a4 4 0 0 1-5.6-5.6l2.6-2.6a4 4 0 0 1 5.6 0"/>'
+        '<path d="m14.5 9.5 1.7-1.7a4 4 0 0 1 5.6 5.6l-2.6 2.6a4 4 0 0 1-5.6 0"/>'
+        '<circle cx="12" cy="12" r="2" fill="{a}" stroke="none"/>'
+    ),
+    "history": (
+        '<circle cx="12" cy="12" r="8.5"/>'
+        '<path d="M12 7.5v5l3.2 1.9"/>'
+        '<circle cx="12" cy="12" r="1.6" fill="{a}" stroke="none"/>'
+    ),
+    "clock": (
+        '<circle cx="12" cy="12" r="8.5"/>'
+        '<path d="M12 7.5v5l3.2 1.9"/>'
+    ),
+    "settings": (
+        '<path d="M3 6h7M14 6h7M3 12h3M10 12h11M3 18h11M18 18h3"/>'
+        '<circle cx="12" cy="6" r="2" fill="{a}" stroke="{a}"/>'
+        '<circle cx="8" cy="12" r="2" fill="{a}" stroke="{a}"/>'
+        '<circle cx="16" cy="18" r="2" fill="{a}" stroke="{a}"/>'
+    ),
+    "sliders": (
+        '<path d="M4 21v-6M4 9V3M12 21v-8M12 7V3M20 21v-4M20 11V3"/>'
+        '<path d="M1.5 13h5M9.5 9h5M17.5 15h5"/>'
+        '<circle cx="4" cy="15" r="1.8" fill="{a}" stroke="none"/>'
+        '<circle cx="12" cy="11" r="1.8" fill="{a}" stroke="none"/>'
+        '<circle cx="20" cy="17" r="1.8" fill="{a}" stroke="none"/>'
+    ),
+    "home": (
+        '<path d="m3.5 10 8.5-7 8.5 7v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>'
+        '<path d="M9.5 21v-6h5v6"/>'
+        '<rect x="10.8" y="16" width="2.4" height="2.4" rx="0.8" fill="{a}" stroke="none"/>'
+    ),
+    "folder": (
+        '<path d="M3.5 6.5A2.5 2.5 0 0 1 6 4h3l2 2.5h7A2.5 2.5 0 0 1 20.5 9v7.5A2.5 2.5 0 0 1 18 19H6a2.5 2.5 0 0 1-2.5-2.5z"/>'
+        '<rect x="6.5" y="11" width="4.2" height="2.6" rx="1.3" fill="{a}" stroke="none"/>'
+    ),
+    "package": (
+        '<path d="M20.5 8.2v7.6a2 2 0 0 1-1 1.7l-6.5 3.7a2 2 0 0 1-2 0l-6.5-3.7a2 2 0 0 1-1-1.7V8.2a2 2 0 0 1 1-1.7l6.5-3.7a2 2 0 0 1 2 0l6.5 3.7a2 2 0 0 1 1 1.7z"/>'
+        '<path d="m4 7 8 4.6L20 7"/><path d="M12 21.2V11.6"/>'
+        '<rect x="9.5" y="13.8" width="5" height="2.6" rx="1.3" fill="{a}" stroke="none"/>'
+    ),
+    "database": (
+        '<ellipse cx="12" cy="6" rx="7.5" ry="3"/>'
+        '<path d="M4.5 6v12c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3V6"/>'
+        '<path d="M4.5 12c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3"/>'
+        '<rect x="9" y="10.7" width="6" height="2.6" rx="1.3" fill="{a}" stroke="none"/>'
+    ),
+    "refresh": (
+        '<path d="M20.5 12a8.5 8.5 0 0 1-14.5 6l-3-3"/>'
+        '<path d="M3 20.5v-5.5h5.5"/>'
+        '<path d="M3.5 12A8.5 8.5 0 0 1 18 6l3 3"/>'
+        '<path d="M21 3.5V9h-5.5"/>'
+        '<circle cx="12" cy="12" r="2" fill="{a}" stroke="none"/>'
+    ),
+    "layers": (
+        '<path d="m12 3 9 4.5-9 4.5-9-4.5z" fill="{a}" stroke="none"/>'
+        '<path d="m12 3 9 4.5-9 4.5-9-4.5z"/>'
+        '<path d="m3 12 9 4.5 9-4.5"/>'
+        '<path d="m3 16.5 9 4.5 9-4.5"/>'
+    ),
+    "briefcase": (
+        '<rect x="3" y="7.5" width="18" height="12.5" rx="2.5"/>'
+        '<path d="M8.5 7.5V6a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1.5"/>'
+        '<rect x="9.8" y="12" width="4.4" height="3" rx="1.2" fill="{a}" stroke="none"/>'
+    ),
+    "drive": (
+        '<rect x="3" y="5" width="18" height="14" rx="2.5"/>'
+        '<path d="M3 13.5h18"/>'
+        '<circle cx="7" cy="16.6" r="1.2" fill="{a}" stroke="none"/>'
+        '<path d="M11 16.6h6"/>'
+    ),
+    "shield": (
+        '<path d="M12 3 20 6v5.5c0 4.5-3.4 7.7-8 9-4.6-1.3-8-4.5-8-9V6z"/>'
+        '<path d="m8.3 12 2.4 2.4 5-5.2" stroke="{a}"/>'
+    ),
+    "search": (
+        '<circle cx="11" cy="11" r="6.5"/>'
+        '<path d="m16 16 4.5 4.5"/>'
+        '<circle cx="11" cy="11" r="2" fill="{a}" stroke="none"/>'
+    ),
+    "play": '<path d="M8 5.5v13l10-6.5z" fill="{a}" stroke="{a}"/>',
+    "pause": (
+        '<rect x="7" y="5" width="3.4" height="14" rx="1.2" fill="{a}" stroke="{a}"/>'
+        '<rect x="13.6" y="5" width="3.4" height="14" rx="1.2" fill="{a}" stroke="{a}"/>'
+    ),
+    "check": '<path d="M4 12.5 9.5 18 20 6.5" stroke-width="2.3"/>',
+    "x": '<path d="M6 6l12 12M18 6 6 18" stroke-width="2.1"/>',
+    "alert": (
+        '<path d="M12 3.5 21 19.5H3z"/>'
+        '<path d="M12 9v4.5"/>'
+        '<circle cx="12" cy="17" r="1.2" fill="{a}" stroke="none"/>'
+    ),
+    "trash": (
+        '<path d="M4 7h16"/>'
+        '<path d="M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2"/>'
+        '<path d="m6 7 1 12a2 2 0 0 0 2 1.8h6a2 2 0 0 0 2-1.8l1-12"/>'
+        '<rect x="10" y="11" width="4" height="5" rx="1" fill="{a}" stroke="none"/>'
+    ),
+    "external": (
+        '<path d="M14 4h6v6"/><path d="M20 4 11 13"/>'
+        '<path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/>'
+        '<circle cx="20" cy="4" r="1.6" fill="{a}" stroke="none"/>'
+    ),
+    "arrow-right": (
+        '<path d="M4 12h15"/><path d="m13 6 6 6-6 6"/>'
+        '<circle cx="4" cy="12" r="1.4" fill="{a}" stroke="none"/>'
+    ),
     "chevron-down": '<path d="m6 9 6 6 6-6"/>',
-    "chevron-right": '<path d="m9 18 6-6-6-6"/>',
-    "chevron-left": '<path d="m15 18-6-6 6-6"/>',
-    "undo": ('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
-    "download": ('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'
-                 '<path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>'),
-    "clock": ('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
-    "filter": '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
-    "plus": '<path d="M12 5v14"/><path d="M5 12h14"/>',
-    "minus": '<path d="M5 12h14"/>',
-    "more": ('<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'
-             '<circle cx="5" cy="12" r="1"/>'),
-    "info": ('<circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/>'
-             '<path d="M12 8h.01"/>'),
-    "cpu": ('<rect x="6" y="6" width="12" height="12" rx="2"/>'
-            '<path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>'),
-    "image": ('<rect x="3" y="3" width="18" height="18" rx="2"/>'
-              '<circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>'),
-    "film": ('<rect x="2" y="2" width="20" height="20" rx="2.5"/>'
-             '<path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"/>'),
-    "file-archive": ('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
-                     '<path d="M14 2v6h6"/><path d="M10 12h4M10 16h4"/>'),
-    "server": ('<rect x="2" y="2" width="20" height="8" rx="2"/>'
-               '<rect x="2" y="14" width="20" height="8" rx="2"/>'
-               '<path d="M6 6h.01M6 18h.01"/>'),
-    "zap": '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
-    "lock": ('<rect x="3" y="11" width="18" height="11" rx="2"/>'
-             '<path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
-    "user": ('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>'
-             '<circle cx="12" cy="7" r="4"/>'),
-    "grid": ('<rect x="3" y="3" width="7" height="7" rx="1.5"/>'
-             '<rect x="14" y="3" width="7" height="7" rx="1.5"/>'
-             '<rect x="3" y="14" width="7" height="7" rx="1.5"/>'
-             '<rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
-    "sliders": ('<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/>'
-                '<path d="M1 14h6M9 8h6M17 16h6"/>'),
-    "save": ('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>'
-             '<path d="M17 21v-8H7v8M7 3v5h8"/>'),
-    "square": '<rect x="5" y="5" width="14" height="14" rx="1.5"/>',
-    "copy": ('<rect x="9" y="9" width="13" height="13" rx="2"/>'
-             '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'),
-    "arrow-up-right": '<path d="M7 17 17 7"/><path d="M7 7h10v10"/>',
-    "dot": '<circle cx="12" cy="12" r="4"/>',
-    "loader": ('<path d="M21 12a9 9 0 1 1-6.2-8.5"/>'),
+    "chevron-right": '<path d="m9 6 6 6-6 6"/>',
+    "chevron-left": '<path d="m15 6-6 6 6 6"/>',
+    "undo": (
+        '<path d="M8.5 5 3 10l5.5 5"/>'
+        '<path d="M3 10h10a6 6 0 0 1 0 12h-2"/>'
+        '<circle cx="8.5" cy="5" r="1.4" fill="{a}" stroke="none"/>'
+    ),
+    "download": (
+        '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/>'
+        '<path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>'
+        '<rect x="10" y="17" width="4" height="2.4" rx="1.2" fill="{a}" stroke="none"/>'
+    ),
+    "filter": (
+        '<path d="M3.5 5h17l-6.5 7.5V20l-4-2v-5.5z"/>'
+        '<circle cx="12" cy="9" r="1.5" fill="{a}" stroke="none"/>'
+    ),
+    "plus": '<path d="M12 5v14M5 12h14" stroke-width="2.1"/>',
+    "minus": '<path d="M5 12h14" stroke-width="2.1"/>',
+    "more": (
+        '<circle cx="5" cy="12" r="1.6" fill="{a}" stroke="none"/>'
+        '<circle cx="12" cy="12" r="1.6" fill="{a}" stroke="none"/>'
+        '<circle cx="19" cy="12" r="1.6" fill="{a}" stroke="none"/>'
+    ),
+    "info": (
+        '<circle cx="12" cy="12" r="8.5"/>'
+        '<path d="M12 11v5"/>'
+        '<circle cx="12" cy="8" r="1.2" fill="{a}" stroke="none"/>'
+    ),
+    "cpu": (
+        '<rect x="6" y="6" width="12" height="12" rx="2"/>'
+        '<path d="M9.5 2v4M14.5 2v4M9.5 18v4M14.5 18v4M2 9.5h4M2 14.5h4M18 9.5h4M18 14.5h4"/>'
+        '<rect x="10" y="10" width="4" height="4" rx="1" fill="{a}" stroke="none"/>'
+    ),
+    "image": (
+        '<rect x="3" y="3" width="18" height="18" rx="2.5"/>'
+        '<circle cx="9" cy="9" r="2" fill="{a}" stroke="none"/>'
+        '<path d="m21 15-3.4-3.4a2 2 0 0 0-2.8 0L6 21"/>'
+    ),
+    "film": (
+        '<rect x="2.5" y="3" width="19" height="18" rx="2.5"/>'
+        '<path d="M7 3v18M17 3v18M2.5 12h19M2.5 7h4.5M2.5 17h4.5M17 17h4.5M17 7h4.5"/>'
+        '<rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="{a}" stroke="none"/>'
+    ),
+    "file-archive": (
+        '<path d="M14 2.5H6A2 2 0 0 0 4 4.5v15A2 2 0 0 0 6 21.5h12a2 2 0 0 0 2-2V8.5z"/>'
+        '<path d="M14 2.5v6h6"/>'
+        '<path d="M10 11h4M10 15h4"/>'
+        '<rect x="10" y="12.6" width="4" height="1.8" rx="0.9" fill="{a}" stroke="none"/>'
+    ),
+    "server": (
+        '<rect x="2.5" y="3" width="19" height="7.5" rx="2"/>'
+        '<rect x="2.5" y="13.5" width="19" height="7.5" rx="2"/>'
+        '<circle cx="6.5" cy="6.8" r="1.2" fill="{a}" stroke="none"/>'
+        '<circle cx="6.5" cy="17.2" r="1.2" fill="{a}" stroke="none"/>'
+        '<path d="M11 6.8h6M11 17.2h6"/>'
+    ),
+    "zap": '<path d="M13 2.5 4 14h7l-1 7.5L20 10h-7z" fill="{a}" stroke="{a}"/>',
+    "lock": (
+        '<rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/>'
+        '<path d="M7.5 10.5V7a4.5 4.5 0 0 1 9 0v3.5"/>'
+        '<circle cx="12" cy="15.5" r="1.8" fill="{a}" stroke="none"/>'
+    ),
+    "user": (
+        '<circle cx="12" cy="7.5" r="4"/>'
+        '<path d="M4 21v-2a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v2"/>'
+        '<circle cx="12" cy="7.5" r="1.5" fill="{a}" stroke="none"/>'
+    ),
+    "save": (
+        '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>'
+        '<path d="M7 3v6h8V3"/>'
+        '<rect x="8" y="14" width="8" height="6" rx="1" fill="{a}" stroke="none"/>'
+    ),
+    "square": '<rect x="5" y="5" width="14" height="14" rx="2"/>',
+    "copy": (
+        '<rect x="8.5" y="8.5" width="12" height="12" rx="2"/>'
+        '<rect x="3.5" y="3.5" width="12" height="12" rx="2" fill="{a}" stroke="none"/>'
+        '<rect x="3.5" y="3.5" width="12" height="12" rx="2"/>'
+    ),
+    "arrow-up-right": (
+        '<path d="M7 17 17 7"/><path d="M8 7h9v9"/>'
+        '<circle cx="19" cy="5" r="1.4" fill="{a}" stroke="none"/>'
+    ),
+    "dot": '<circle cx="12" cy="12" r="4" fill="{a}" stroke="none"/>',
+    "loader": '<path d="M21 12a9 9 0 1 1-6.2-8.5"/>',
 }
 
+# 同形别名
+_PATHS["overview"] = _PATHS["dashboard"]
+_PATHS["slimming"] = _PATHS["sparkles"]
 
-def _svg(name: str, color: str, stroke: float) -> str:
-    body = _PATHS.get(name, _PATHS["dot"])
-    fill = "none"
-    if name in ("play", "filter", "zap", "dot"):
-        fill = color
+
+def _svg(name: str, color: str, accent: str, stroke: float) -> str:
+    body = _PATHS.get(name, _PATHS["dot"]).replace("{a}", accent)
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
-        f'fill="{fill}" stroke="{color}" stroke-width="{stroke}" '
+        f'fill="none" stroke="{color}" stroke-width="{stroke}" '
         f'stroke-linecap="round" stroke-linejoin="round">{body}</svg>'
     )
 
 
-@lru_cache(maxsize=512)
+@lru_cache(maxsize=1024)
 def icon_pixmap(name: str, color: str = theme.TEXT_2, size: int = 18,
-                stroke: float = 1.8) -> QPixmap:
-    svg = _svg(name, color, stroke)
+                accent: str | None = None, stroke: float = 1.8) -> QPixmap:
+    accent = accent or color
+    svg = _svg(name, color, accent, stroke)
     renderer = QSvgRenderer(QByteArray(svg.encode("utf-8")))
     dpr = 2
     pix = QPixmap(int(size * dpr), int(size * dpr))
@@ -137,13 +266,13 @@ def icon_pixmap(name: str, color: str = theme.TEXT_2, size: int = 18,
 
 
 def icon(name: str, color: str = theme.TEXT_2, size: int = 18,
-         stroke: float = 1.8) -> QIcon:
-    return QIcon(icon_pixmap(name, color, size, stroke))
+         accent: str | None = None, stroke: float = 1.8) -> QIcon:
+    return QIcon(icon_pixmap(name, color, size, accent, stroke))
 
 
 @lru_cache(maxsize=32)
 def logo_pixmap(size: int = 36) -> QPixmap:
-    """品牌标记：青紫渐变圆角方块 + C 形环 + 青色光点。"""
+    """品牌标记：赭红底色 + 奶油色 C 形环 + 橄榄色光点。"""
     dpr = 2
     px = int(size * dpr)
     pix = QPixmap(px, px)
@@ -152,26 +281,31 @@ def logo_pixmap(size: int = 36) -> QPixmap:
     p.setRenderHint(QPainter.Antialiasing)
     rect = QRectF(1.5 * dpr, 1.5 * dpr, px - 3 * dpr, px - 3 * dpr)
     grad = QLinearGradient(rect.topLeft(), rect.bottomRight())
-    grad.setColorAt(0.0, QColor("#7C6CFF"))
-    grad.setColorAt(0.55, QColor("#5B7CFA"))
-    grad.setColorAt(1.0, QColor("#2DD4BF"))
+    grad.setColorAt(0.0, QColor("#C25B3B"))
+    grad.setColorAt(0.55, QColor("#B44A2D"))
+    grad.setColorAt(1.0, QColor("#943A25"))
     p.setPen(Qt.NoPen)
     p.setBrush(QBrush(grad))
-    p.drawRoundedRect(rect, px * 0.28, px * 0.28)
+    p.drawRoundedRect(rect, px * 0.27, px * 0.27)
 
-    # C 形环
-    pen = QPen(QColor(255, 255, 255, 235))
-    pen.setWidthF(px * 0.085)
+    # 内侧高光
+    p.setBrush(QColor(255, 248, 240, 18))
+    p.drawRoundedRect(rect.adjusted(px * 0.06, px * 0.06, -px * 0.06, -px * 0.06),
+                      px * 0.23, px * 0.23)
+
+    # 奶油色 C 形环
+    pen = QPen(QColor("#FFF6E9"))
+    pen.setWidthF(px * 0.088)
     pen.setCapStyle(Qt.RoundCap)
     p.setPen(pen)
     p.setBrush(Qt.NoBrush)
-    ring = rect.adjusted(px * 0.24, px * 0.24, -px * 0.24, -px * 0.24)
+    ring = rect.adjusted(px * 0.25, px * 0.25, -px * 0.25, -px * 0.25)
     p.drawArc(ring, 42 * 16, 282 * 16)
 
-    # 光点（C 的开口处）
+    # 橄榄色光点（C 的开口处）
     p.setPen(Qt.NoPen)
-    p.setBrush(QColor("#A5F3FC"))
-    dot = px * 0.075
+    p.setBrush(QColor("#C6C79A"))
+    dot = px * 0.078
     cx = rect.right() - px * 0.22
     cy = rect.center().y()
     p.drawEllipse(QRectF(cx - dot, cy - dot, dot * 2, dot * 2))

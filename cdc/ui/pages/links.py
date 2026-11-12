@@ -60,7 +60,7 @@ class LinkRow(QFrame):
         center.addWidget(source)
         target = ElidedLabel(f"→  {info.target or '（无法读取目标）'}", "Mono")
         target.setStyleSheet(
-            f"color:{theme.TEAL if not info.broken else theme.RED};font-size:10px;"
+            f"color:{theme.TEAL if not info.broken else theme.RED};font-size:12px;"
         )
         center.addWidget(target)
         layout.addLayout(center, 1)
@@ -69,7 +69,7 @@ class LinkRow(QFrame):
         right.setSpacing(3)
         size = QLabel(fmt_size(info.size_bytes) if info.size_bytes else "—")
         size.setStyleSheet(
-            f"color:{theme.TEXT};font-family:'JetBrains Mono';font-size:13px;font-weight:700;"
+            f"color:{theme.TEXT};font-family:'Cascadia Mono';font-size:13px;font-weight:700;"
         )
         size.setAlignment(Qt.AlignRight)
         right.addWidget(size)

@@ -7,10 +7,12 @@ from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
-    QProgressBar, QPushButton, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
+    QAbstractItemView, QApplication, QCheckBox, QComboBox, QFileDialog, QFrame,
+    QGridLayout, QHBoxLayout, QLabel, QListView, QProgressBar, QPushButton,
+    QScrollArea, QSpinBox, QTreeView, QVBoxLayout, QWidget,
 )
 
+from ...core import windows
 from ...core.models import (
     ACTION_ARCHIVE, MODE_COPY, MODE_LABELS, MODE_LINK, MODE_MOVE,
     TIER_LABELS, TIER_OPTIONAL, TIER_RECOMMEND, TIER_SKIP, TIER_STRONG,
@@ -63,9 +65,11 @@ class ArchiveRow(QFrame):
     archive = Signal(object)
     open_requested = Signal(str)
 
-    def __init__(self, candidate: ArchiveCandidate, parent: QWidget | None = None) -> None:
+    def __init__(self, candidate: ArchiveCandidate, dest_path: str = "",
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.candidate = candidate
+        self.dest_path = dest_path or candidate.dest_path
         self.setObjectName("Row")
         self.setProperty("selected", False)
         layout = QHBoxLayout(self)
@@ -95,7 +99,7 @@ class ArchiveRow(QFrame):
         top.addStretch()
         center.addLayout(top)
         reason = QLabel(candidate.reason)
-        reason.setStyleSheet(f"color:{theme.TEXT_2};font-size:11px;")
+        reason.setStyleSheet(f"color:{theme.TEXT_2};font-size:12px;")
         center.addWidget(reason)
         chips = QHBoxLayout()
         chips.setSpacing(4)
@@ -115,15 +119,15 @@ class ArchiveRow(QFrame):
         right.setSpacing(3)
         size = QLabel(fmt_size(candidate.size_bytes))
         size.setStyleSheet(
-            f"color:{theme.TEXT};font-family:'JetBrains Mono';font-size:14px;font-weight:700;"
+            f"color:{theme.TEXT};font-family:'Cascadia Mono';font-size:14px;font-weight:700;"
         )
         size.setAlignment(Qt.AlignRight)
         right.addWidget(size)
-        drive_hint = candidate.dest_path[:2] if len(candidate.dest_path) >= 2 else "?"
-        dest = QLabel(f"→ {drive_hint} 归档")
-        dest.setStyleSheet(f"color:{theme.DIM};font-size:10px;")
+        dest = QLabel(f"→ {self.dest_path}")
+        dest.setStyleSheet(f"color:{theme.DIM};font-size:12px;")
         dest.setAlignment(Qt.AlignRight)
-        dest.setToolTip(candidate.dest_path)
+        dest.setMaximumWidth(260)
+        dest.setToolTip(self.dest_path)
         right.addWidget(dest)
         layout.addLayout(right)
 
@@ -159,6 +163,7 @@ class ArchivePage(QWidget):
         self.selected: dict[str, ArchiveCandidate] = {}
         self._rows: list[ArchiveRow] = []
         self.dest_drive: str = ""
+        self.custom_dirs: list[str] = []
         self._build()
         state.analysis_started.connect(self._on_analysis_started)
         state.analysis_progress.connect(self._on_analysis_progress)
@@ -197,14 +202,15 @@ class ArchivePage(QWidget):
         top = QHBoxLayout()
         top.setSpacing(14)
         self.dest_card = GlassCard(18, 11)
-        self.dest_card.add(card_header("归档目标", "只推荐非系统盘；机械盘 / USB 外置盘优先"))
+        self.dest_card.add(card_header(
+            "归档到", "选中的目录会按目录名放到该路径下，同级排列"))
         self.drive_row = QHBoxLayout()
         self.drive_row.setSpacing(9)
         self.dest_card.add_layout(self.drive_row)
         root_row = QHBoxLayout()
         root_row.setSpacing(9)
-        root_row.addWidget(label("归档根目录", "Label"))
-        self.root_picker = PathPicker(self._archive_root(), "例如 E:\\CDriveArchive")
+        root_row.addWidget(label("目标路径", "Label"))
+        self.root_picker = PathPicker(self._archive_root(), r"例如 E:\ 或 E:\ColdStore")
         self.root_picker.changed.connect(self._on_root_changed)
         root_row.addWidget(self.root_picker, 1)
         self.dest_card.add_layout(root_row)
@@ -232,7 +238,7 @@ class ArchivePage(QWidget):
         self.plan_card.add(card_header("本次归档", "选择候选后生成执行计划"))
         self.plan_value = QLabel("0 B")
         self.plan_value.setStyleSheet(
-            f"color:{theme.TEXT};font-family:'JetBrains Mono';"
+            f"color:{theme.TEXT};font-family:'Cascadia Mono';"
             "font-size:26px;font-weight:800;"
         )
         self.plan_card.add(self.plan_value)
@@ -289,6 +295,28 @@ class ArchivePage(QWidget):
         self.btn_cancel_analysis.hide()
         scan_row.addWidget(self.btn_cancel_analysis)
         scan_card.add_layout(scan_row)
+
+        custom_row = QHBoxLayout()
+        custom_row.setSpacing(9)
+        custom_row.addWidget(IconTile("folder", "amber", 30, 15))
+        custom_row.addWidget(label("自定义目录（可多选）", "Label"))
+        self.custom_label = ElidedLabel("未选择", "Muted")
+        self.custom_label.setMinimumWidth(180)
+        custom_row.addWidget(self.custom_label, 1)
+        self.btn_clear_custom = QPushButton("清除")
+        self.btn_clear_custom.setObjectName("Link")
+        self.btn_clear_custom.setCursor(Qt.PointingHandCursor)
+        self.btn_clear_custom.clicked.connect(self._clear_custom_root)
+        self.btn_clear_custom.setEnabled(False)
+        custom_row.addWidget(self.btn_clear_custom)
+        self.btn_pick_custom = ghost_button("选择目录", "folder")
+        self.btn_pick_custom.clicked.connect(self._pick_custom_root)
+        custom_row.addWidget(self.btn_pick_custom)
+        self.btn_direct_custom = primary_button("归档所选目录", "archive")
+        self.btn_direct_custom.setEnabled(False)
+        self.btn_direct_custom.clicked.connect(self._archive_custom_direct)
+        custom_row.addWidget(self.btn_direct_custom)
+        scan_card.add_layout(custom_row)
         content.addWidget(scan_card)
 
         # 候选列表
@@ -369,8 +397,8 @@ class ArchivePage(QWidget):
         self.batch.hide()
         outer.addWidget(self.batch)
         self.batch.setStyleSheet(
-            f"QFrame#BatchBar {{ background:rgba(9,14,24,0.97); "
-            f"border-top:1px solid {theme.BORDER_HI}; }}"
+            "QFrame#BatchBar { background:#FBF8F2; "
+            "border-top:1px solid #DCD3C2; }"
         )
 
         self._init_destination()
@@ -391,7 +419,7 @@ class ArchivePage(QWidget):
             self.state.archive_drives()[0].letter if self.state.archive_drives() else "")
         self._render_drives()
         if self.dest_drive and letter not in candidates:
-            self.root_picker.set_text(f"{self.dest_drive}:\\CDriveArchive")
+            self.root_picker.set_text(f"{self.dest_drive}:\\ColdStore")
         self._update_plan()
 
     def _refresh_drives(self) -> None:
@@ -418,7 +446,7 @@ class ArchivePage(QWidget):
         self.dest_drive = letter.upper()
         current = self.root_picker.text()
         if not current or current[:1].upper() != letter.upper():
-            self.root_picker.set_text(f"{letter}:\\CDriveArchive")
+            self.root_picker.set_text(f"{letter}:\\ColdStore")
         self._render_drives()
         self._update_plan()
 
@@ -430,21 +458,23 @@ class ArchivePage(QWidget):
                 self.dest_drive = letter
                 self._render_drives()
         self._update_plan()
+        if self.state.analysis.candidates:
+            self._render()
 
     def _on_mode(self, mode: str) -> None:
         if mode == MODE_LINK:
-            text = "复制并校验后删除源目录，再在原位置建立 Junction；程序仍按原路径访问。"
+            text = "复制并校验后清空源内容，再在原位置建立 Junction；程序仍按原路径访问。"
             tone = "warn"
         elif mode == MODE_COPY:
             text = "只复制并校验，源目录保留；适合先备份、暂不释放空间。"
             tone = "info"
         else:
-            text = "复制并校验后删除源目录；源路径消失，空间立即释放。"
+            text = "复制并校验后清空源目录内容，保留目录结构与空子目录；空间立即释放。"
             tone = "success"
         self.mode_note.setText(text)
         self.mode_note.setStyleSheet(
             f"color:{theme.GREEN if tone == 'success' else theme.AMBER if tone == 'warn' else theme.MUT};"
-            "font-size:11px;"
+            "font-size:12px;"
         )
         self._update_plan()
 
@@ -488,7 +518,135 @@ class ArchivePage(QWidget):
             rows.append((home, "C 用户目录"))
         if self.root_d.isChecked() and os.path.isdir("D:\\"):
             rows.append(("D:\\", "D 盘根目录"))
+        for path in self.custom_dirs:
+            if os.path.isdir(path):
+                rows.append((path, os.path.basename(path.rstrip("\\/")) or "自定义目录"))
         return rows
+
+    def _pick_custom_root(self) -> None:
+        start = self.custom_dirs[-1] if self.custom_dirs else (self._archive_root() or "D:\\")
+        dialog = QFileDialog(self.window(), "选择要归档的目录（可多选）")
+        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+        dialog.setOption(QFileDialog.ShowDirsOnly, True)
+        dialog.setFileMode(QFileDialog.ExistingFiles)
+        dialog.setDirectory(start)
+        for view in list(dialog.findChildren(QListView)) + list(dialog.findChildren(QTreeView)):
+            view.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        if not dialog.exec():
+            return
+        paths = [os.path.normpath(p) for p in dialog.selectedFiles()
+                 if os.path.isdir(p)]
+        if not paths:
+            self.state.toast.emit("没有选中目录", "warn")
+            return
+        existing = {os.path.normcase(p) for p in self.custom_dirs}
+        for path in paths:
+            if os.path.normcase(path) == os.path.normcase(self._archive_root()):
+                continue
+            if os.path.normcase(path) not in existing:
+                self.custom_dirs.append(path)
+                existing.add(os.path.normcase(path))
+        self._refresh_custom_label()
+        self.analysis_state.setText("已选择自定义目录，可分析或归档")
+
+    def _refresh_custom_label(self) -> None:
+        if not self.custom_dirs:
+            self.custom_label.set_full_text("未选择")
+            self.custom_label.setToolTip("")
+            self.btn_clear_custom.setEnabled(False)
+            self.btn_direct_custom.setEnabled(False)
+            return
+        names = "、".join(os.path.basename(p.rstrip("\\/")) or p
+                         for p in self.custom_dirs)
+        self.custom_label.set_full_text(f"已选 {len(self.custom_dirs)} 个：{names}")
+        self.custom_label.setToolTip("\n".join(self.custom_dirs))
+        self.btn_clear_custom.setEnabled(True)
+        self.btn_direct_custom.setEnabled(True)
+
+    def _clear_custom_root(self) -> None:
+        self.custom_dirs.clear()
+        self._refresh_custom_label()
+
+    def _dest_for_path(self, path: str) -> str:
+        return os.path.join(self._archive_root(),
+                            os.path.basename(path.rstrip("\\/")) or path)
+
+    def _duplicate_dests(self, items: list[OperationItem]) -> list[str]:
+        seen: dict[str, str] = {}
+        dupes: list[str] = []
+        for item in items:
+            key = os.path.normcase(os.path.abspath(item.dest))
+            if key in seen:
+                dupes.append(f"{os.path.basename(item.source)} → {item.dest}")
+            else:
+                seen[key] = item.source
+        return dupes
+
+    def _archive_custom_direct(self) -> None:
+        if not self.custom_dirs:
+            self.state.toast.emit("请先选择目录（可多选）", "warn")
+            return
+        items: list[OperationItem] = []
+        total = 0
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            for path in self.custom_dirs:
+                if not os.path.isdir(path):
+                    continue
+                is_link = windows.is_link(path)
+                target = windows.junction_target(path) if is_link else ""
+                stat_root = target if is_link and target else path
+                size = windows.directory_stats(stat_root, collect_ext=False).bytes
+                mode = MODE_LINK if is_link else self.mode.value()
+                extra = {"junction_source": True, "old_target": target} if is_link else {}
+                item = OperationItem(
+                    action=ACTION_ARCHIVE,
+                    source=path,
+                    dest=self._dest_for_path(path),
+                    name=os.path.basename(path.rstrip("\\/")) or path,
+                    size_bytes=size,
+                    mode=mode,
+                    needs_admin=self.state.config.needs_admin_for(path),
+                    extra=extra,
+                )
+                items.append(item)
+                total += size
+        finally:
+            QApplication.restoreOverrideCursor()
+        if not items:
+            self.state.toast.emit("没有可归档的目录", "warn")
+            return
+        dupes = self._duplicate_dests(items)
+        if dupes:
+            ConfirmDialog.show_info(
+                self.window(), "目录名冲突",
+                "多个目录会归档到同一个目标路径，请改名或分批处理。",
+                "\n".join(dupes[:8]), icon_name="alert", tone="rose")
+            return
+        mode = self.mode.value()
+        note = {
+            MODE_MOVE: "复制并校验后清空每个源目录的内容，但保留目录结构与空子目录。",
+            MODE_LINK: "复制并校验后清空内容，并在原位置建立 Junction。",
+            MODE_COPY: "仅复制并校验，源目录保留。",
+        }.get(mode, "")
+        lines = "\n".join(f"· {i.name}  {fmt_size(i.size_bytes)} → {i.dest}"
+                          for i in items[:8])
+        if len(items) > 8:
+            lines += f"\n… 另有 {len(items) - 8} 个"
+        ok = ConfirmDialog.ask(
+            self.window(),
+            f"归档 {len(items)} 个目录？" if len(items) > 1 else f"归档「{items[0].name}」？",
+            f"{MODE_LABELS.get(mode, '')} · 共 {human_bytes(total)} → {self._archive_root()}",
+            "开始归档",
+            tone="teal",
+            details=lines,
+            note=note,
+            note_tone="warn" if mode == MODE_LINK else "success",
+            require_check=True,
+            icon_name="archive",
+        )
+        if ok:
+            self.state.start_operation(items)
 
     def _analyze(self) -> None:
         roots = self._roots()
@@ -575,7 +733,7 @@ class ArchivePage(QWidget):
             header.addStretch()
             self.rows_box.addLayout(header)
             for cand in rows:
-                row = ArchiveRow(cand)
+                row = ArchiveRow(cand, self._dest_for(cand))
                 row.toggled.connect(self._on_row_toggled)
                 row.archive.connect(self._archive_one)
                 row.open_requested.connect(open_path)
@@ -623,12 +781,7 @@ class ArchivePage(QWidget):
         self._update_plan()
 
     def _dest_for(self, cand: ArchiveCandidate) -> str:
-        root = self._archive_root()
-        try:
-            rel = os.path.relpath(cand.path, f"{cand.source_drive}:\\")
-        except (ValueError, OSError):
-            rel = cand.name
-        return os.path.join(root, cand.source_drive, rel)
+        return os.path.join(self._archive_root(), cand.name)
 
     def _make_items(self, candidates: list[ArchiveCandidate]) -> list[OperationItem]:
         mode = self.mode.value()
@@ -664,17 +817,26 @@ class ArchivePage(QWidget):
     def _confirm_and_run(self, candidates: list[ArchiveCandidate]) -> None:
         if not candidates:
             return
+        items = self._make_items(candidates)
+        dupes = self._duplicate_dests(items)
+        if dupes:
+            ConfirmDialog.show_info(
+                self.window(), "目录名冲突",
+                "多个目录会归档到同一个目标路径，请改名或分批处理。",
+                "\n".join(dupes[:8]), icon_name="alert", tone="rose")
+            return
         total = sum(c.size_bytes for c in candidates)
         mode = self.mode.value()
         root = self._archive_root()
-        names = "\n".join(f"· {c.name}  {fmt_size(c.size_bytes)}" for c in candidates[:6])
+        names = "\n".join(f"· {c.name}  {fmt_size(c.size_bytes)} → {i.dest}"
+                          for c, i in zip(candidates[:6], items[:6]))
         if len(candidates) > 6:
             names += f"\n… 另有 {len(candidates) - 6} 项"
         drive = next((d for d in self.state.drives
                       if d.letter.upper() == self.dest_drive), None)
         note = {
-            MODE_MOVE: "校验通过后才会删除源目录；归档后源路径消失。",
-            MODE_LINK: "校验后删除源目录并建立 Junction；若目标是外置盘，拔盘后原路径不可用。",
+            MODE_MOVE: "校验通过后清空源目录内容，但保留目录结构；源路径仍然存在。",
+            MODE_LINK: "校验后清空源内容并建立 Junction；若目标是外置盘，拔盘后原路径不可用。",
             MODE_COPY: "仅复制，源目录保留，不会释放空间。",
         }.get(mode, "")
         if drive and drive.is_usb:
@@ -693,7 +855,7 @@ class ArchivePage(QWidget):
             f"{mode_text} · 共 {human_bytes(total)} → {root}",
             "开始归档",
             tone="teal",
-            details=names + f"\n\n目标根目录：{root}",
+            details=names + f"\n\n目标路径：{root}",
             note=note,
             note_tone="warn" if (drive and drive.is_usb) or mode == MODE_LINK or bool(linked)
             else "success",
@@ -702,5 +864,5 @@ class ArchivePage(QWidget):
         )
         if not ok:
             return
-        if self.state.start_operation(self._make_items(candidates)):
+        if self.state.start_operation(items):
             self._clear_selection()

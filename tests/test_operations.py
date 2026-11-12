@@ -77,7 +77,11 @@ class OperationTests(unittest.TestCase):
                              size_bytes=windows.directory_size(str(src)))
         result = archive_item(item, self.ctx)
         self.assertTrue(result.ok, result.error)
-        self.assertFalse(src.exists())
+        # 移动归档保留源目录骨架，只清空内容
+        self.assertTrue(src.exists())
+        self.assertTrue((src / "sub").exists())
+        self.assertEqual(list((src / "sub").iterdir()), [])
+        self.assertFalse((src / "a.txt").exists())
         self.assertTrue((dst / "a.txt").exists())
         restore = OperationItem(action="restore", source=str(src), dest=str(dst),
                                 name="videos")

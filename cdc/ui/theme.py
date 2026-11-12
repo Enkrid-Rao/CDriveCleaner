@@ -1,7 +1,9 @@
 """UI 设计令牌与全局样式表。
 
-视觉语言：深色「极光玻璃」——墨蓝底、低对比边框、青紫渐变品牌色；
-C / D / E 三块盘各有固定语义色，所有页面复用，形成空间认知。
+视觉语言：暖纸张 + 墨色 + 赭红。
+- 内容区用暖白纸张，侧边栏用深墨色，形成清晰层级；
+- 正文以高对比深墨色为主，辅助文字不低于 11px，避免旧版细小灰字；
+- 图标统一为「墨线 + 单点实色」的双色几何风格。
 """
 
 from __future__ import annotations
@@ -12,48 +14,51 @@ from PySide6.QtGui import QColor
 # 颜色
 # ============================================================
 
-BG = "#060910"
-BG_1 = "#090E19"
-BG_2 = "#0D1422"
-SIDEBAR = "rgba(8, 12, 21, 0.94)"
-SURFACE = "rgba(18, 25, 41, 0.78)"
-SURFACE_2 = "rgba(23, 32, 52, 0.88)"
-SURFACE_3 = "rgba(30, 41, 65, 0.92)"
-SURFACE_HOVER = "rgba(38, 52, 82, 0.98)"
-INPUT = "rgba(10, 16, 28, 0.92)"
+BG = "#F2EEE5"
+BG_1 = "#ECE6DA"
+BG_2 = "#E5DDCE"
 
-BORDER = "rgba(255, 255, 255, 0.072)"
-BORDER_HI = "rgba(255, 255, 255, 0.145)"
-BORDER_STRONG = "rgba(255, 255, 255, 0.22)"
+SIDEBAR = "#25231E"
+SIDEBAR_2 = "#2E2B24"
+SIDEBAR_LINE = "#3A362D"
 
-TEXT = "#EEF2F9"
-TEXT_2 = "#C3CCDB"
-MUT = "#8E9BB0"
-DIM = "#5C687C"
+SURFACE = "#FBF8F2"
+SURFACE_2 = "#F6F1E7"
+SURFACE_3 = "#EFE8DB"
+SURFACE_HOVER = "#E8DFCF"
+INPUT = "#FFFDF9"
 
-BRAND = "#6D5EF8"
-BRAND_2 = "#38BDF8"
-BRAND_3 = "#A78BFA"
-PINK = "#F472B6"
-CYAN = "#22D3EE"
-TEAL = "#2DD4BF"
-GREEN = "#34D399"
-AMBER = "#FBBF24"
-ORANGE = "#FB923C"
-ROSE = "#FB7185"
-RED = "#F87171"
+BORDER = "#DED6C6"
+BORDER_HI = "#CEC3AF"
+BORDER_STRONG = "#B4A68D"
 
-C_COLOR = ROSE
-D_COLOR = "#A78BFA"
+TEXT = "#26231D"
+TEXT_2 = "#4A4439"
+MUT = "#665F52"
+DIM = "#7C7363"
+
+BRAND = "#B44A2D"
+BRAND_2 = "#D97757"
+BRAND_3 = "#8C6A43"
+PINK = "#9A4A5C"
+CYAN = "#2E6F6A"
+TEAL = "#39706B"
+GREEN = "#5B7246"
+AMBER = "#A66C1D"
+ORANGE = "#A9552A"
+ROSE = "#A94B3F"
+RED = "#9E3B34"
+
+C_COLOR = BRAND
+D_COLOR = "#6D7551"
 E_COLOR = TEAL
 
-# 字体栈：拉丁字符优先 JetBrains Mono（数字/路径不抖），中文回退微软雅黑
-UI_STACK = ("'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', "
-            "'PingFang SC', 'Noto Sans CJK SC', sans-serif")
-MONO_STACK = ("'JetBrains Mono', 'Cascadia Code', 'Cascadia Mono', 'Consolas', "
+# 字体：正文优先 Segoe UI Variable Text + 微软雅黑；数字/路径用等宽，但不用它承载大段中文
+UI_STACK = ("'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', "
+            "'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', sans-serif")
+MONO_STACK = ("'Cascadia Mono', 'JetBrains Mono', 'Consolas', "
               "'Microsoft YaHei UI', monospace")
 
-# 运行时动画开关（设置页可关）
 MOTION = True
 
 
@@ -70,50 +75,51 @@ def qcolor(hex_color: str, alpha: int | None = None) -> QColor:
 
 
 TONE_COLORS = {
-    "brand": BRAND_2,
-    "purple": BRAND_3,
-    "cyan": CYAN,
-    "teal": TEAL,
-    "green": GREEN,
-    "amber": AMBER,
-    "orange": ORANGE,
-    "rose": ROSE,
-    "red": RED,
-    "pink": PINK,
-    "muted": MUT,
+    "brand": "#A8432A",
+    "purple": "#7C5A36",
+    "cyan": "#2E6F6A",
+    "teal": "#39706B",
+    "green": "#5B7246",
+    "amber": "#96651C",
+    "orange": "#A9552A",
+    "rose": "#A94B3F",
+    "red": "#9E3B34",
+    "pink": "#9A4A5C",
+    "muted": "#6F6759",
     "text": TEXT,
     "c": C_COLOR,
     "d": D_COLOR,
     "e": E_COLOR,
 }
+
 TONE_BG = {
-    "brand": "rgba(56, 189, 248, 0.13)",
-    "purple": "rgba(167, 139, 250, 0.13)",
-    "cyan": "rgba(34, 211, 238, 0.12)",
-    "teal": "rgba(45, 212, 191, 0.12)",
-    "green": "rgba(52, 211, 153, 0.12)",
-    "amber": "rgba(251, 191, 36, 0.12)",
-    "orange": "rgba(251, 146, 60, 0.12)",
-    "rose": "rgba(251, 113, 133, 0.12)",
-    "red": "rgba(248, 113, 113, 0.12)",
-    "pink": "rgba(244, 114, 182, 0.12)",
-    "muted": "rgba(142, 155, 176, 0.10)",
-    "text": "rgba(238, 242, 249, 0.08)",
+    "brand": "rgba(180, 74, 45, 0.10)",
+    "purple": "rgba(124, 90, 54, 0.10)",
+    "cyan": "rgba(46, 111, 106, 0.10)",
+    "teal": "rgba(57, 112, 107, 0.10)",
+    "green": "rgba(91, 114, 70, 0.10)",
+    "amber": "rgba(166, 108, 29, 0.10)",
+    "orange": "rgba(169, 85, 42, 0.10)",
+    "rose": "rgba(169, 75, 63, 0.10)",
+    "red": "rgba(158, 59, 52, 0.10)",
+    "pink": "rgba(154, 74, 92, 0.10)",
+    "muted": "rgba(111, 103, 89, 0.08)",
+    "text": "rgba(38, 35, 29, 0.06)",
 }
 
 TONE_BORDER = {
-    "brand": "rgba(56, 189, 248, 0.32)",
-    "purple": "rgba(167, 139, 250, 0.32)",
-    "cyan": "rgba(34, 211, 238, 0.30)",
-    "teal": "rgba(45, 212, 191, 0.30)",
-    "green": "rgba(52, 211, 153, 0.30)",
-    "amber": "rgba(251, 191, 36, 0.30)",
-    "orange": "rgba(251, 146, 60, 0.30)",
-    "rose": "rgba(251, 113, 133, 0.30)",
-    "red": "rgba(248, 113, 113, 0.30)",
-    "pink": "rgba(244, 114, 182, 0.30)",
-    "muted": "rgba(142, 155, 176, 0.22)",
-    "text": "rgba(238, 242, 249, 0.18)",
+    "brand": "rgba(180, 74, 45, 0.28)",
+    "purple": "rgba(124, 90, 54, 0.26)",
+    "cyan": "rgba(46, 111, 106, 0.26)",
+    "teal": "rgba(57, 112, 107, 0.26)",
+    "green": "rgba(91, 114, 70, 0.26)",
+    "amber": "rgba(166, 108, 29, 0.26)",
+    "orange": "rgba(169, 85, 42, 0.26)",
+    "rose": "rgba(169, 75, 63, 0.26)",
+    "red": "rgba(158, 59, 52, 0.26)",
+    "pink": "rgba(154, 74, 92, 0.26)",
+    "muted": "rgba(111, 103, 89, 0.20)",
+    "text": "rgba(38, 35, 29, 0.16)",
 }
 
 
@@ -125,7 +131,7 @@ _chevron_cache: dict[str, str] = {}
 
 
 def chevron_png(direction: str = "down", color: str = MUT) -> str:
-    """生成 QSS 用的箭头 PNG（QSS 无法直接画三角形）。"""
+    """生成 QSS 用的箭头 PNG。"""
     key = f"{direction}-{color}"
     if key in _chevron_cache:
         return _chevron_cache[key]
@@ -168,133 +174,130 @@ def chevron_png(direction: str = "down", color: str = MUT) -> str:
 # QSS
 # ============================================================
 
-def build_qss(font_size: int = 13, motion: bool = True) -> str:
-    """生成全局样式表。font_size 会等比缩放主要字号。"""
-    f = max(10, int(font_size or 13))
-    scale = f / 13.0
+def build_qss(font_size: int = 14, motion: bool = True) -> str:
+    """生成全局样式表。"""
+    f = max(14, int(font_size or 14))
+    scale = f / 14.0
     arrow_down = chevron_png("down")
     arrow_up = chevron_png("up")
 
     def px(base: float) -> int:
-        return max(9, int(round(base * scale)))
+        return max(12, int(round(base * scale)))
 
     return f"""
 * {{
     font-family: {UI_STACK};
-    font-size: {px(13)}px;
+    font-size: {px(14)}px;
     color: {TEXT};
     outline: none;
     selection-background-color: {BRAND};
-    selection-color: #ffffff;
+    selection-color: #FFF8F0;
 }}
 
-QMainWindow, QWidget#Root, QWidget#PageRoot {{
-    background: transparent;
-}}
-
+QMainWindow, QWidget#Root, QWidget#PageRoot {{ background: transparent; }}
 QLabel {{ background: transparent; }}
 QWidget#Transparent {{ background: transparent; }}
 
 /* ================= 侧边栏 / 标题栏 ================= */
 QFrame#Sidebar {{
     background: {SIDEBAR};
-    border-right: 1px solid {BORDER};
+    border-right: 1px solid {SIDEBAR_LINE};
 }}
 QFrame#TitleBar {{
-    background: rgba(6, 9, 16, 0.55);
+    background: rgba(248, 244, 236, 0.96);
     border-bottom: 1px solid {BORDER};
 }}
 QLabel#AppName {{
-    color: {TEXT};
+    color: #F7F0E4;
     font-size: {px(16)}px;
-    font-weight: 800;
+    font-weight: 700;
 }}
 QLabel#AppTag {{
-    color: {DIM};
-    font-size: {px(10)}px;
-    font-weight: 600;
+    color: #A69C8C;
+    font-size: {px(12)}px;
+    font-weight: 500;
 }}
 QLabel#SidebarGroup {{
-    color: {DIM};
-    font-size: {px(10)}px;
-    font-weight: 700;
+    color: #8F8575;
+    font-size: {px(12)}px;
+    font-weight: 600;
 }}
 QLabel#Breadcrumb {{
     color: {MUT};
-    font-size: {px(12)}px;
+    font-size: {px(13)}px;
 }}
 QLabel#BreadcrumbActive {{
-    color: {TEXT_2};
-    font-size: {px(12)}px;
+    color: {TEXT};
+    font-size: {px(13)}px;
     font-weight: 600;
 }}
 
 /* ================= 页面标题 ================= */
 QLabel#PageTitle {{
     color: {TEXT};
-    font-size: {px(26)}px;
-    font-weight: 800;
+    font-size: {px(30)}px;
+    font-weight: 700;
 }}
 QLabel#PageSubtitle {{
     color: {MUT};
-    font-size: {px(12)}px;
+    font-size: {px(13)}px;
 }}
 QLabel#SectionTitle {{
     color: {TEXT};
-    font-size: {px(15)}px;
+    font-size: {px(17)}px;
     font-weight: 700;
 }}
 QLabel#SectionHint {{
     color: {MUT};
-    font-size: {px(11)}px;
+    font-size: {px(12)}px;
 }}
 QLabel#CardTitle {{
     color: {TEXT};
-    font-size: {px(14)}px;
-    font-weight: 700;
+    font-size: {px(15)}px;
+    font-weight: 600;
 }}
 QLabel#Label {{
     color: {MUT};
-    font-size: {px(11)}px;
+    font-size: {px(12)}px;
     font-weight: 600;
 }}
 QLabel#Value {{
     color: {TEXT};
     font-family: {MONO_STACK};
-    font-size: {px(24)}px;
+    font-size: {px(27)}px;
     font-weight: 700;
 }}
 QLabel#ValueSmall {{
     color: {TEXT};
     font-family: {MONO_STACK};
-    font-size: {px(15)}px;
+    font-size: {px(17)}px;
     font-weight: 700;
 }}
 QLabel#Mono {{
     color: {TEXT_2};
     font-family: {MONO_STACK};
-    font-size: {px(11)}px;
+    font-size: {px(12)}px;
 }}
 QLabel#MonoMuted {{
-    color: {DIM};
+    color: {MUT};
     font-family: {MONO_STACK};
-    font-size: {px(10)}px;
+    font-size: {px(12)}px;
 }}
 QLabel#Body {{
     color: {TEXT_2};
-    font-size: {px(12)}px;
+    font-size: {px(14)}px;
 }}
 QLabel#Muted {{
     color: {MUT};
-    font-size: {px(11)}px;
+    font-size: {px(12)}px;
 }}
 QLabel#Dim {{
     color: {DIM};
-    font-size: {px(10)}px;
+    font-size: {px(12)}px;
 }}
-QLabel#ErrorText {{ color: {RED}; font-size: {px(11)}px; }}
-QLabel#WarnText {{ color: {AMBER}; font-size: {px(11)}px; }}
-QLabel#SuccessText {{ color: {GREEN}; font-size: {px(11)}px; }}
+QLabel#ErrorText {{ color: {RED}; font-size: {px(12)}px; }}
+QLabel#WarnText {{ color: {AMBER}; font-size: {px(12)}px; }}
+QLabel#SuccessText {{ color: {GREEN}; font-size: {px(12)}px; }}
 
 /* ================= 卡片 ================= */
 QFrame#Card {{
@@ -303,53 +306,53 @@ QFrame#Card {{
     border-radius: 16px;
 }}
 QFrame#CardSoft {{
-    background: rgba(17, 24, 39, 0.58);
-    border: 1px solid {BORDER};
+    background: {SURFACE_2};
+    border: 1px solid #E3DAC9;
     border-radius: 14px;
 }}
 QFrame#CardInset {{
-    background: rgba(10, 15, 26, 0.62);
-    border: 1px solid {BORDER};
+    background: {SURFACE_3};
+    border: 1px solid #E0D7C5;
     border-radius: 12px;
 }}
 QFrame#Hero {{
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 rgba(41, 33, 92, 0.92),
-        stop:0.45 rgba(20, 30, 58, 0.94),
-        stop:1 rgba(11, 25, 40, 0.96));
-    border: 1px solid rgba(124, 108, 255, 0.28);
+        stop:0 #FFF9EF,
+        stop:0.55 #F9EFE2,
+        stop:1 #F2E2D2);
+    border: 1px solid #E4CDB8;
     border-radius: 20px;
 }}
 QFrame#Row {{
-    background: rgba(17, 24, 39, 0.52);
-    border: 1px solid {BORDER};
-    border-radius: 13px;
+    background: {SURFACE};
+    border: 1px solid #E1D8C6;
+    border-radius: 12px;
 }}
 QFrame#Row:hover {{
-    background: rgba(26, 36, 58, 0.74);
-    border: 1px solid {BORDER_HI};
+    background: #F7F1E5;
+    border: 1px solid #D2C6B1;
 }}
 QFrame#RowSelected {{
-    background: rgba(35, 42, 72, 0.82);
-    border: 1px solid rgba(124, 108, 255, 0.46);
-    border-radius: 13px;
+    background: #FAEAE3;
+    border: 1px solid #D9A58F;
+    border-radius: 12px;
 }}
 QFrame#DriveCard {{
-    background: rgba(17, 24, 39, 0.54);
-    border: 1px solid {BORDER};
+    background: #FAF6EE;
+    border: 1px solid #E1D8C6;
     border-radius: 14px;
 }}
 QFrame#DriveCard:hover {{
-    background: rgba(25, 34, 55, 0.72);
-    border: 1px solid {BORDER_HI};
+    background: #F5EEDF;
+    border: 1px solid #D2C6B1;
 }}
 QFrame#DriveCard[selected="true"] {{
-    background: rgba(38, 42, 82, 0.82);
-    border: 1px solid rgba(124, 108, 255, 0.66);
+    background: #F9E9E1;
+    border: 1px solid #C87C60;
 }}
 QFrame#SegContainer {{
-    background: rgba(8, 13, 23, 0.7);
-    border: 1px solid {BORDER};
+    background: #F2ECDF;
+    border: 1px solid #DED4C1;
     border-radius: 11px;
 }}
 QPushButton#SegBtn {{
@@ -360,11 +363,10 @@ QPushButton#SegBtn {{
     color: {MUT};
     font-weight: 600;
 }}
-QPushButton#SegBtn:hover {{ background: rgba(255, 255, 255, 0.05); color: {TEXT_2}; }}
+QPushButton#SegBtn:hover {{ background: rgba(180, 74, 45, 0.07); color: {TEXT}; }}
 QPushButton#SegBtn:checked {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 rgba(109, 94, 248, 0.85), stop:1 rgba(56, 189, 248, 0.75));
-    color: #ffffff;
+    background: #B44A2D;
+    color: #FFF8F0;
 }}
 QFrame#Divider {{
     background: {BORDER};
@@ -373,101 +375,91 @@ QFrame#Divider {{
     border: none;
 }}
 QFrame#Note {{
-    background: rgba(20, 28, 46, 0.66);
+    background: #F5EFE3;
     border: 1px solid {BORDER};
     border-radius: 12px;
 }}
 QFrame#NoteWarn {{
-    background: rgba(251, 191, 36, 0.075);
-    border: 1px solid rgba(251, 191, 36, 0.22);
+    background: #FBF1D9;
+    border: 1px solid #E8CE96;
     border-radius: 12px;
 }}
 QFrame#NoteDanger {{
-    background: rgba(248, 113, 113, 0.075);
-    border: 1px solid rgba(248, 113, 113, 0.22);
+    background: #FAE8E4;
+    border: 1px solid #E0B4A9;
     border-radius: 12px;
 }}
 QFrame#NoteSuccess {{
-    background: rgba(52, 211, 153, 0.07);
-    border: 1px solid rgba(52, 211, 153, 0.22);
+    background: #EFF1E6;
+    border: 1px solid #CBD3B5;
     border-radius: 12px;
 }}
 
 /* ================= 按钮 ================= */
 QPushButton {{
-    background: {SURFACE_2};
-    border: 1px solid {BORDER};
+    background: #F3ECDF;
+    border: 1px solid #DCD2C0;
     border-radius: 10px;
-    padding: 8px 14px;
+    padding: 9px 16px;
     color: {TEXT_2};
-    font-size: {px(12)}px;
+    font-size: {px(13)}px;
     font-weight: 600;
 }}
 QPushButton:hover {{
-    background: {SURFACE_3};
-    border-color: {BORDER_HI};
+    background: #EBE2D2;
+    border-color: {BORDER_STRONG};
     color: {TEXT};
 }}
-QPushButton:pressed {{ background: {SURFACE}; }}
+QPushButton:pressed {{ background: #E4D9C7; }}
 QPushButton:disabled {{
-    background: rgba(18, 25, 41, 0.35);
-    border-color: rgba(255, 255, 255, 0.04);
-    color: {DIM};
+    background: #F2EDE4;
+    border-color: #E5DDD0;
+    color: #A79D8C;
 }}
 
 QPushButton#Primary {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 {BRAND}, stop:1 {BRAND_2});
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: #ffffff;
-    font-weight: 700;
+    background: #B44A2D;
+    border: 1px solid #9C3E27;
+    color: #FFF8F0;
+    font-weight: 600;
 }}
-QPushButton#Primary:hover {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #7C6DFF, stop:1 #5CCBFA);
-}}
-QPushButton#Primary:pressed {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #5A4CE0, stop:1 #2F9BC7);
-}}
+QPushButton#Primary:hover {{ background: #A8432A; border-color: #893421; }}
+QPushButton#Primary:pressed {{ background: #943A25; }}
 QPushButton#Primary:disabled {{
-    background: rgba(45, 55, 80, 0.7);
-    border-color: transparent;
-    color: {DIM};
+    background: #DFD5C4;
+    border-color: #D5CAB8;
+    color: #928876;
 }}
 QPushButton#Ghost {{
     background: transparent;
-    border: 1px solid {BORDER_HI};
+    border: 1px solid #CFC5B2;
     color: {TEXT_2};
 }}
 QPushButton#Ghost:hover {{
-    background: rgba(255, 255, 255, 0.045);
+    background: #F3EDE1;
     border-color: {BORDER_STRONG};
     color: {TEXT};
 }}
 QPushButton#Danger {{
-    background: rgba(248, 113, 113, 0.10);
-    border: 1px solid rgba(248, 113, 113, 0.30);
-    color: {RED};
+    background: #FAE8E4;
+    border: 1px solid #D9A79B;
+    color: #9A3B31;
 }}
-QPushButton#Danger:hover {{
-    background: rgba(248, 113, 113, 0.18);
-    border-color: rgba(248, 113, 113, 0.55);
-}}
+QPushButton#Danger:hover {{ background: #F5D8D2; border-color: #C98F81; }}
 QPushButton#Success {{
-    background: rgba(52, 211, 153, 0.12);
-    border: 1px solid rgba(52, 211, 153, 0.30);
-    color: {GREEN};
+    background: #EFF1E6;
+    border: 1px solid #C5CEAF;
+    color: #4E653D;
 }}
-QPushButton#Success:hover {{ background: rgba(52, 211, 153, 0.20); }}
+QPushButton#Success:hover {{ background: #E6EAD8; }}
 QPushButton#Link {{
     background: transparent;
     border: none;
-    color: {BRAND_2};
+    color: {BRAND};
     padding: 4px 6px;
     font-weight: 600;
 }}
-QPushButton#Link:hover {{ color: #7DD3FC; text-decoration: underline; }}
+QPushButton#Link:hover {{ color: #8E3420; text-decoration: underline; }}
 QPushButton#IconBtn {{
     background: transparent;
     border: 1px solid transparent;
@@ -475,80 +467,79 @@ QPushButton#IconBtn {{
     padding: 0;
 }}
 QPushButton#IconBtn:hover {{
-    background: rgba(255, 255, 255, 0.06);
+    background: #F1EADF;
     border-color: {BORDER};
 }}
 QPushButton#RowAction {{
-    background: rgba(109, 94, 248, 0.12);
-    border: 1px solid rgba(109, 94, 248, 0.30);
-    color: #C7C2FF;
-    padding: 6px 12px;
+    background: #F7E7E0;
+    border: 1px solid #E0B7A7;
+    color: #9F3F27;
+    padding: 7px 13px;
     border-radius: 9px;
-    font-weight: 700;
+    font-weight: 600;
 }}
 QPushButton#RowAction:hover {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 {BRAND}, stop:1 #4F8CF7);
-    border-color: transparent;
-    color: #fff;
+    background: #B44A2D;
+    border-color: #9C3E27;
+    color: #FFF8F0;
 }}
 QPushButton#RowWarn {{
-    background: rgba(251, 191, 36, 0.10);
-    border: 1px solid rgba(251, 191, 36, 0.28);
-    color: {AMBER};
-    padding: 6px 12px;
+    background: #FAF1DA;
+    border: 1px solid #E3C98F;
+    color: #8A5C14;
+    padding: 7px 13px;
     border-radius: 9px;
-    font-weight: 700;
+    font-weight: 600;
 }}
-QPushButton#RowWarn:hover {{ background: rgba(251, 191, 36, 0.2); }}
+QPushButton#RowWarn:hover {{ background: #F4E5C2; }}
 QPushButton#RowDanger {{
-    background: rgba(248, 113, 113, 0.08);
-    border: 1px solid rgba(248, 113, 113, 0.24);
-    color: {RED};
-    padding: 6px 12px;
+    background: #FAE8E4;
+    border: 1px solid #E0B4A9;
+    color: #9A3B31;
+    padding: 7px 13px;
     border-radius: 9px;
-    font-weight: 700;
+    font-weight: 600;
 }}
-QPushButton#RowDanger:hover {{ background: rgba(248, 113, 113, 0.18); }}
+QPushButton#RowDanger:hover {{ background: #F5D8D2; }}
 QPushButton#WindowBtn {{
     background: transparent;
     border: none;
     border-radius: 0;
     padding: 0;
-    color: {MUT};
-    font-size: {px(13)}px;
+    color: #6D6559;
+    font-size: {px(14)}px;
 }}
-QPushButton#WindowBtn:hover {{ background: rgba(255, 255, 255, 0.07); color: {TEXT}; }}
+QPushButton#WindowBtn:hover {{ background: #EDE5D8; color: {TEXT}; }}
 QPushButton#CloseBtn {{
     background: transparent;
     border: none;
     border-radius: 0;
     padding: 0;
-    color: {MUT};
-    font-size: {px(13)}px;
+    color: #6D6559;
+    font-size: {px(14)}px;
 }}
-QPushButton#CloseBtn:hover {{ background: #C42B1C; color: #ffffff; }}
+QPushButton#CloseBtn:hover {{ background: #A33A34; color: #FFF8F0; }}
 
 /* ================= 输入 ================= */
 QLineEdit, QSpinBox, QComboBox, QFontComboBox {{
     background: {INPUT};
-    border: 1px solid {BORDER_HI};
+    border: 1px solid #D8CFBE;
     border-radius: 10px;
-    padding: 7px 11px;
+    padding: 8px 11px;
     color: {TEXT};
-    font-size: {px(12)}px;
-    min-height: 18px;
+    font-size: {px(13)}px;
+    min-height: 20px;
 }}
 QLineEdit:focus, QSpinBox:focus, QComboBox:focus, QFontComboBox:focus {{
-    border: 1px solid rgba(109, 94, 248, 0.72);
-    background: rgba(13, 20, 35, 0.98);
+    border: 1px solid #B44A2D;
+    background: #FFFFFF;
 }}
-QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled {{ color: {DIM}; }}
-QLineEdit[error="true"] {{ border-color: rgba(248, 113, 113, 0.7); }}
+QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled {{ color: #A79D8C; }}
+QLineEdit[error="true"] {{ border-color: #A33A34; }}
 QSpinBox::up-button, QSpinBox::down-button {{
-    subcontrol-origin: border; width: 18px; border: none; background: transparent;
+    subcontrol-origin: border; width: 20px; border: none; background: transparent;
 }}
-QSpinBox::up-button:hover, QSpinBox::down-button:hover {{ background: rgba(109,94,248,0.16); }}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {{ background: #F3EADB; }}
 QSpinBox::up-arrow {{
     image: url("{arrow_up}"); width: 9px; height: 9px;
     subcontrol-position: center;
@@ -568,58 +559,55 @@ QComboBox::down-arrow, QFontComboBox::down-arrow {{
     margin-right: 9px;
 }}
 QComboBox QAbstractItemView, QFontComboBox QAbstractItemView {{
-    background: {BG_2};
+    background: {SURFACE};
     color: {TEXT};
-    border: 1px solid {BORDER_HI};
+    border: 1px solid #D8CFBE;
     border-radius: 8px;
-    selection-background-color: {BRAND};
-    selection-color: #fff;
+    selection-background-color: #B44A2D;
+    selection-color: #FFF8F0;
     outline: 0;
     padding: 4px;
 }}
 QSlider {{ min-height: 24px; }}
 QSlider::groove:horizontal {{
-    height: 5px; background: rgba(255,255,255,0.09); border-radius: 3px;
+    height: 5px; background: #E6DECD; border-radius: 3px;
 }}
 QSlider::sub-page:horizontal {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 {BRAND}, stop:1 {BRAND_2});
+    background: #B44A2D;
     border-radius: 3px;
 }}
 QSlider::handle:horizontal {{
-    background: #ffffff; width: 15px; height: 15px;
-    margin: -5px 0; border-radius: 7px;
-    border: 2px solid {BRAND_2};
+    background: #FFFDF9; width: 16px; height: 16px;
+    margin: -6px 0; border-radius: 8px;
+    border: 2px solid #B44A2D;
 }}
-QSlider::handle:horizontal:hover {{ border-color: #fff; }}
-QCheckBox {{ color: {TEXT_2}; font-size: {px(12)}px; spacing: 8px; }}
+QSlider::handle:horizontal:hover {{ border-color: #8E3420; }}
+QCheckBox {{ color: {TEXT_2}; font-size: {px(13)}px; spacing: 8px; }}
 QCheckBox::indicator {{
     width: 16px; height: 16px; border-radius: 5px;
-    background: {INPUT}; border: 1px solid {BORDER_HI};
+    background: {INPUT}; border: 1px solid #CFC5B2;
 }}
-QCheckBox::indicator:checked {{ background: {BRAND}; border-color: {BRAND}; }}
+QCheckBox::indicator:checked {{ background: #B44A2D; border-color: #B44A2D; }}
 
 /* ================= 滚动 ================= */
 QScrollArea {{ background: transparent; border: none; }}
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
-QScrollBar:vertical {{
-    background: transparent; width: 9px; margin: 3px 2px;
-}}
+QScrollBar:vertical {{ background: transparent; width: 10px; margin: 3px 2px; }}
 QScrollBar::handle:vertical {{
-    background: rgba(255, 255, 255, 0.13); border-radius: 4px; min-height: 34px;
+    background: #CFC5B2; border-radius: 4px; min-height: 36px;
 }}
-QScrollBar::handle:vertical:hover {{ background: rgba(255, 255, 255, 0.26); }}
+QScrollBar::handle:vertical:hover {{ background: #B6A991; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
-QScrollBar:horizontal {{ background: transparent; height: 9px; margin: 2px 3px; }}
+QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 2px 3px; }}
 QScrollBar::handle:horizontal {{
-    background: rgba(255, 255, 255, 0.13); border-radius: 4px; min-width: 34px;
+    background: #CFC5B2; border-radius: 4px; min-width: 36px;
 }}
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
 
 /* ================= 进度 ================= */
 QProgressBar {{
-    background: rgba(255, 255, 255, 0.075);
+    background: #E8DFCF;
     border: none;
     border-radius: 4px;
     height: 8px;
@@ -628,60 +616,54 @@ QProgressBar {{
 }}
 QProgressBar::chunk {{
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 {BRAND}, stop:0.55 {BRAND_3}, stop:1 {BRAND_2});
+        stop:0 #B44A2D, stop:1 #C08A2E);
     border-radius: 4px;
 }}
 
 /* ================= 文本 / 列表 ================= */
 QTextEdit#LogBody, QPlainTextEdit {{
-    background: rgba(7, 11, 20, 0.86);
-    border: 1px solid {BORDER};
+    background: #F7F1E5;
+    border: 1px solid #DDD3C1;
     border-radius: 10px;
     color: {TEXT_2};
     font-family: {MONO_STACK};
-    font-size: {px(11)}px;
-    padding: 8px 10px;
+    font-size: {px(12)}px;
+    padding: 9px 11px;
     selection-background-color: {BRAND};
+    selection-color: #FFF8F0;
 }}
-QListWidget {{
-    background: transparent; border: none; outline: 0;
-}}
+QListWidget {{ background: transparent; border: none; outline: 0; }}
 QToolTip {{
-    background: #141C2C;
-    color: {TEXT};
-    border: 1px solid {BORDER_HI};
+    background: {SIDEBAR};
+    color: #F7F0E4;
+    border: 1px solid {SIDEBAR_LINE};
     border-radius: 8px;
-    padding: 6px 9px;
-    font-size: {px(11)}px;
+    padding: 7px 10px;
+    font-size: {px(12)}px;
 }}
 
 /* ================= 对话框 ================= */
-QDialog#Dialog {{
-    background: #0B111D;
-    border: 1px solid {BORDER_HI};
-    border-radius: 18px;
-}}
+QDialog#Dialog {{ background: #FBF8F2; border: 1px solid {BORDER_HI}; border-radius: 18px; }}
 QFrame#DialogCard {{ background: transparent; border: none; }}
 QFrame#ProgressCard {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #111A2B, stop:1 #0A101C);
-    border: 1px solid {BORDER_HI};
+    background: #FCF9F3;
+    border: 1px solid #D8CDBA;
     border-radius: 20px;
 }}
 QFrame#Toast {{
-    background: #131C2D;
+    background: #FFFCF6;
     border: 1px solid {BORDER_HI};
     border-radius: 12px;
 }}
-QLabel#ToastText {{ color: {TEXT}; font-size: {px(12)}px; font-weight: 600; }}
+QLabel#ToastText {{ color: {TEXT}; font-size: {px(13)}px; font-weight: 600; }}
 
-/* ================= 日历 / 杂项 ================= */
+/* ================= 菜单 ================= */
 QMenu {{
-    background: {BG_2};
+    background: {SURFACE};
     border: 1px solid {BORDER_HI};
     border-radius: 10px;
     padding: 6px;
 }}
 QMenu::item {{ padding: 7px 18px; border-radius: 6px; color: {TEXT_2}; }}
-QMenu::item:selected {{ background: {SURFACE_3}; color: {TEXT}; }}
+QMenu::item:selected {{ background: #F1E7D9; color: {TEXT}; }}
 """

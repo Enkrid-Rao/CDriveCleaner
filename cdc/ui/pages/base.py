@@ -123,7 +123,7 @@ def drive_badge(letter: str, tone: str | None = None) -> QLabel:
     badge.setStyleSheet(
         f"background:{theme.TONE_BG.get(tone, theme.TONE_BG['brand'])};"
         f"color:{color};border:1px solid {theme.TONE_BORDER.get(tone, theme.BORDER_HI)};"
-        "border-radius:9px;font-family:'JetBrains Mono';font-size:13px;font-weight:800;"
+        "border-radius:9px;font-family:'Cascadia Mono';font-size:13px;font-weight:800;"
     )
     return badge
 

@@ -2,7 +2,7 @@
   "version": 2,
   "storage": {
     "link_root": "D:\\_CDrive",
-    "archive_root": "E:\\CDriveArchive",
+    "archive_root": "E:\\",
     "threshold_mb": 100,
     "archive_min_mb": 200,
     "temp_retention_days": 1,
@@ -16,7 +16,7 @@
     "delete_after_undo": true
   },
   "appearance": {
-    "font_size": 13,
+    "font_size": 14,
     "motion": true,
     "density": "cozy"
   },
@@ -177,7 +177,7 @@
     }
   },
   "ui": {
-    "last_page": "dashboard",
+    "last_page": "archive",
     "window": {
       "width": 1280,
       "height": 820

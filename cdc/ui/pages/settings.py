@@ -70,8 +70,8 @@ class SettingsPage(ScrollPage):
         archive = GlassCard(18, 6)
         archive.add(card_header("冷数据归档", "机械盘 / 外置盘与默认归档方式"))
         self.archive_root = PathPicker(self.state.config.archive_root,
-                                       r"例如 E:\CDriveArchive")
-        archive.add(FormRow("归档根目录", "建议指向机械盘；归档后的数据按 C/D 盘路径分层存放。",
+                                       r"例如 E:\ColdStore")
+        archive.add(FormRow("默认归档路径", "选中的目录会按目录名放到该路径下（同级）。",
                             self.archive_root, stretch=True))
         self.archive_min = QSpinBox()
         self.archive_min.setRange(50, 51200)
@@ -123,12 +123,12 @@ class SettingsPage(ScrollPage):
         font_layout.setContentsMargins(0, 0, 0, 0)
         font_layout.setSpacing(10)
         self.font_slider = QSlider(Qt.Horizontal)
-        self.font_slider.setRange(10, 18)
+        self.font_slider.setRange(14, 20)
         self.font_slider.setValue(self.state.config.font_size)
         self.font_slider.setFixedWidth(220)
         self.font_value = QLabel(f"{self.state.config.font_size} px")
         self.font_value.setStyleSheet(
-            f"color:{theme.BRAND_2};font-family:'JetBrains Mono';font-weight:700;"
+            f"color:{theme.BRAND_2};font-family:'Cascadia Mono';font-weight:700;"
         )
         self.font_slider.valueChanged.connect(
             lambda v: self.font_value.setText(f"{v} px"))
@@ -167,7 +167,7 @@ class SettingsPage(ScrollPage):
             box.addLayout(head)
             value = QLabel(path)
             value.setWordWrap(True)
-            value.setStyleSheet(f"color:{theme.MUT};font-size:10px;")
+            value.setStyleSheet(f"color:{theme.MUT};font-size:12px;")
             box.addWidget(value)
             grid.addWidget(card, 1)
         data.add_layout(grid)
@@ -216,11 +216,11 @@ class SettingsPage(ScrollPage):
         elif link[:1].upper() == "C":
             errors.append("迁移容器不能在 C 盘（源盘）。")
         if not (len(archive) >= 3 and archive[1] == ":"):
-            errors.append("归档根目录必须是带盘符的绝对路径。")
+            errors.append("默认归档路径必须是带盘符的绝对路径。")
         elif archive[:1].upper() == "C":
-            errors.append("归档根目录不能在系统盘 C。")
+            errors.append("默认归档路径不能在系统盘 C。")
         if link.casefold() == archive.casefold():
-            errors.append("迁移容器与归档根目录不能相同。")
+            errors.append("迁移容器与默认归档路径不能相同。")
         if errors:
             self.error_label.setText("  ".join(errors))
             self.error_label.show()

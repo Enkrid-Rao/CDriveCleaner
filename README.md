@@ -66,9 +66,10 @@ CDriveCleaner v2 同时处理两件事：
   - 推荐：影视、ISO、虚拟机镜像、安装包、模型权重、照片素材、长期未动的归档。
   - 不推荐：聊天数据库、代码仓库、`node_modules`、浏览器缓存、IDE 索引。
 - **三种模式**：
-  1. **移动归档**：复制 → 校验 → 删源，源路径消失。
-  2. **链接归档**：复制 → 校验 → 删源 → Junction 指回目标，程序仍可访问原路径。
+  1. **移动归档**：复制 → 校验 → **清空源目录内容，但保留目录结构与空子目录**。
+  2. **链接归档**：复制 → 校验 → 清空源内容 → Junction 指回目标，程序仍可访问原路径。
   3. **仅复制**：只复制并校验，保留源目录。
+- **自定义目录（可多选）**：冷数据推荐之外，可选择任意多个目录直接归档；移动归档后目录本身和子目录结构仍然保留，并按目录名同级放到目标路径。
 - **已链接冷数据二次归档**：例如 `C:\Users\你\Downloads` 已经 Junction 到 D 盘，
   工具会把 D 盘上的真实数据搬到 E 盘，并把 `Downloads` 的链接改指到 E；
   C 盘路径完全不变。
@@ -96,7 +97,7 @@ CDriveCleaner v2 同时处理两件事：
 
 ### 安装版（推荐）
 
-下载 `CDriveCleaner-Setup-v2.0.0.exe`，双击安装。默认安装到当前用户目录，
+下载 `CDriveCleaner-Setup-v2.1.0.exe`，双击安装。默认安装到当前用户目录，
 无需管理员权限；也可以选择为所有用户安装。
 
 - 开始菜单 / 可选桌面快捷方式
@@ -105,13 +106,13 @@ CDriveCleaner v2 同时处理两件事：
 
 ### 便携版
 
-下载 `CDriveCleaner-Portable-v2.0.0.zip`，**解压整个文件夹**后双击
+下载 `CDriveCleaner-Portable-v2.1.0.zip`，**解压整个文件夹**后双击
 `CDriveCleaner.exe`。目录中的 `portable.flag` 会让程序把配置和日志写在
 `data\` 子目录，整个文件夹可以放在 U 盘或移动硬盘里。
 
 > 便携版不要只复制 exe，`_internal` 目录必须一起保留。
 
-发布校验信息与安装/卸载验证见 [docs/RELEASE-v2.0.0.md](docs/RELEASE-v2.0.0.md)。
+发布校验信息与安装/卸载验证见 [docs/RELEASE-v2.1.0.md](docs/RELEASE-v2.1.0.md)。
 
 ### 系统要求
 
@@ -155,8 +156,16 @@ python -m cdc --diagnose
 
 ```
 归档前： C:\Users\你\Downloads  → Junction → D:\_CDrive\Users\你\Downloads (30 GB)
-归档后： C:\Users\你\Downloads  → Junction → E:\CDriveArchive\C\Users\你\Downloads (30 GB)
+归档后： C:\Users\你\Downloads  → Junction → E:\Downloads (30 GB)
          D 盘旧目标已删除，C 盘路径不变
+```
+
+选中多个目录时，它们会按**目录名**同级放到目标路径下：
+
+```
+目标路径：E:\
+选中：D:\Downloads\Software、D:\Downloads\ISO
+结果：E:\Software、E:\ISO
 ```
 
 ### 为什么不用 robocopy /MOVE
@@ -206,8 +215,8 @@ python -m PyInstaller --noconfirm --clean packaging\CDriveCleaner.spec
 
 ```
 dist/CDriveCleaner/CDriveCleaner.exe
-dist/CDriveCleaner-Portable-v2.0.0.zip
-dist/CDriveCleaner-Setup-v2.0.0.exe
+dist/CDriveCleaner-Portable-v2.1.0.zip
+dist/CDriveCleaner-Setup-v2.1.0.exe
 ```
 
 ## 项目结构

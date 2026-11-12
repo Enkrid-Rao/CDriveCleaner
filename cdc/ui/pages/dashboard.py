@@ -74,7 +74,7 @@ class DashboardPage(ScrollPage):
         free_row.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
         self.hero_free = QLabel("—")
         self.hero_free.setStyleSheet(
-            f"color:{theme.TEXT};font-family:'JetBrains Mono';"
+            f"color:{theme.TEXT};font-family:'Cascadia Mono';"
             "font-size:38px;font-weight:800;"
         )
         unit = QLabel("GB")
@@ -375,7 +375,7 @@ class DashboardPage(ScrollPage):
             text_box.addWidget(title)
             path = record.dest if record.action in ("archive", "migrate") else record.source
             sub = QLabel(f"{fmt_time(record.ts)}  ·  {fmt_size(record.bytes_moved)}")
-            sub.setStyleSheet(f"color:{theme.DIM};font-size:10px;")
+            sub.setStyleSheet(f"color:{theme.DIM};font-size:12px;")
             text_box.addWidget(sub)
             layout.addLayout(text_box, 1)
             layout.addWidget(status_pill(record.status))

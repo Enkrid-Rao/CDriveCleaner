@@ -1,13 +1,14 @@
-"""主窗口：极光背景、侧边栏、标题栏、页面栈与全局进度。"""
+"""主窗口：暖纸张画布、深墨侧边栏、标题栏、页面栈与全局进度。"""
 
 from __future__ import annotations
 
 import os
+import random
 from typing import Any
 
 from PySide6.QtCore import QPoint, QRectF, Qt
 from PySide6.QtGui import (
-    QColor, QFont, QIcon, QLinearGradient, QPainter, QPaintEvent, QRadialGradient,
+    QColor, QIcon, QLinearGradient, QPainter, QPaintEvent, QRadialGradient,
     QShortcut, QKeySequence,
 )
 from PySide6.QtWidgets import (
@@ -38,8 +39,8 @@ PAGE_TITLES = {
 }
 
 
-class AuroraBackground(QWidget):
-    """预渲染的极光背景（避免每帧重复画大渐变）。"""
+class PaperBackground(QWidget):
+    """暖纸张画布：微光 + 纸纤维颗粒，预渲染避免重绘。"""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -58,35 +59,43 @@ class AuroraBackground(QWidget):
         p = QPainter(pix)
         p.setRenderHint(QPainter.Antialiasing)
         p.fillRect(0, 0, w, h, QColor(theme.BG))
-        # 左上紫光
-        g1 = QRadialGradient(w * 0.18, h * 0.10, max(w, h) * 0.68)
-        g1.setColorAt(0.0, QColor(109, 94, 248, 54))
-        g1.setColorAt(0.55, QColor(109, 94, 248, 12))
-        g1.setColorAt(1.0, QColor(109, 94, 248, 0))
+
+        # 左上暖光
+        g1 = QRadialGradient(w * 0.20, h * 0.06, max(w, h) * 0.78)
+        g1.setColorAt(0.0, QColor(255, 250, 240, 150))
+        g1.setColorAt(0.55, QColor(255, 250, 240, 40))
+        g1.setColorAt(1.0, QColor(255, 250, 240, 0))
         p.fillRect(QRectF(0, 0, w, h), g1)
-        # 右上青光
-        g2 = QRadialGradient(w * 0.92, h * 0.06, max(w, h) * 0.55)
-        g2.setColorAt(0.0, QColor(56, 189, 248, 30))
-        g2.setColorAt(1.0, QColor(56, 189, 248, 0))
+
+        # 右下鼠尾草色
+        g2 = QRadialGradient(w * 0.92, h * 0.96, max(w, h) * 0.58)
+        g2.setColorAt(0.0, QColor(109, 117, 81, 30))
+        g2.setColorAt(1.0, QColor(109, 117, 81, 0))
         p.fillRect(QRectF(0, 0, w, h), g2)
-        # 右下青绿
-        g3 = QRadialGradient(w * 0.85, h * 0.95, max(w, h) * 0.52)
-        g3.setColorAt(0.0, QColor(45, 212, 191, 20))
-        g3.setColorAt(1.0, QColor(45, 212, 191, 0))
+
+        # 右上赭红余温
+        g3 = QRadialGradient(w * 0.96, h * 0.02, max(w, h) * 0.42)
+        g3.setColorAt(0.0, QColor(180, 74, 45, 16))
+        g3.setColorAt(1.0, QColor(180, 74, 45, 0))
         p.fillRect(QRectF(0, 0, w, h), g3)
-        # 细网格
-        p.setPen(QColor(255, 255, 255, 7))
-        step = 46
-        for x in range(0, int(w), step):
-            p.drawLine(x, 0, x, h)
-        for y in range(0, int(h), step):
-            p.drawLine(0, y, w, y)
-        # 顶部/底部暗角
+
+        # 纸纤维颗粒（固定种子，画面稳定）
+        rng = random.Random(20261112)
+        p.setPen(Qt.NoPen)
+        for _ in range(min(5200, int(w * h / 420))):
+            x = rng.uniform(0, w)
+            y = rng.uniform(0, h)
+            alpha = rng.randint(4, 12)
+            p.setBrush(QColor(92, 77, 56, alpha))
+            size = rng.choice((1, 1, 1, 2))
+            p.drawRect(QRectF(x, y, size, size))
+
+        # 极轻的边缘压暗，让内容区有纸张厚度
         g4 = QLinearGradient(0, 0, 0, h)
-        g4.setColorAt(0.0, QColor(0, 0, 0, 70))
-        g4.setColorAt(0.25, QColor(0, 0, 0, 0))
-        g4.setColorAt(0.85, QColor(0, 0, 0, 0))
-        g4.setColorAt(1.0, QColor(0, 0, 0, 90))
+        g4.setColorAt(0.0, QColor(80, 65, 45, 12))
+        g4.setColorAt(0.18, QColor(80, 65, 45, 0))
+        g4.setColorAt(0.84, QColor(80, 65, 45, 0))
+        g4.setColorAt(1.0, QColor(80, 65, 45, 16))
         p.fillRect(QRectF(0, 0, w, h), g4)
         p.end()
         self._cache = pix
@@ -204,7 +213,7 @@ class MainWindow(ResizableFrameless, QMainWindow):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        self.background = AuroraBackground(root)
+        self.background = PaperBackground(root)
         self.background.setGeometry(self.rect())
         self.background.lower()
         from .widgets import Sidebar

@@ -81,7 +81,7 @@ class ScanRow(QFrame):
         right.setSpacing(4)
         size = QLabel(fmt_size(item.size_bytes))
         size.setStyleSheet(
-            f"color:{theme.TEXT};font-family:'JetBrains Mono';font-size:14px;font-weight:700;"
+            f"color:{theme.TEXT};font-family:'Cascadia Mono';font-size:14px;font-weight:700;"
         )
         size.setAlignment(Qt.AlignRight)
         right.addWidget(size)
@@ -327,8 +327,8 @@ class SlimmingPage(QWidget):
         self.batch.hide()
         outer.addWidget(self.batch)
         self.batch.setStyleSheet(
-            f"QFrame#BatchBar {{ background:rgba(9,14,24,0.97); "
-            f"border-top:1px solid {theme.BORDER_HI}; }}"
+            "QFrame#BatchBar { background:#FBF8F2; "
+            "border-top:1px solid #DCD3C2; }"
         )
         self.refresh()
 
@@ -468,11 +468,11 @@ class SlimmingPage(QWidget):
             layout.setSpacing(9)
             layout.addWidget(Pill(item.zone_label, "muted"))
             name = QLabel(item.name)
-            name.setStyleSheet(f"color:{theme.TEXT_2};font-size:11px;")
+            name.setStyleSheet(f"color:{theme.TEXT_2};font-size:12px;")
             layout.addWidget(name)
             layout.addStretch()
             size = QLabel(fmt_size(item.size_bytes) if item.size_bytes else "—")
-            size.setStyleSheet(f"color:{theme.DIM};font-family:'JetBrains Mono';font-size:10px;")
+            size.setStyleSheet(f"color:{theme.DIM};font-family:'Cascadia Mono';font-size:12px;")
             layout.addWidget(size)
             self.protected_box.addWidget(row)
 

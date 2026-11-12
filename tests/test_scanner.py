@@ -97,7 +97,7 @@ class ScanTests(unittest.TestCase):
         self.assertIn("Videos", names)
         cand = next(c for c in result.candidates if c.name == "Videos")
         self.assertTrue(cand.dest_path.startswith(str(self.e / "archive")))
-        self.assertIn("D", cand.dest_path)
+        self.assertEqual(os.path.basename(cand.dest_path), "Videos")
 
 
 if __name__ == "__main__":

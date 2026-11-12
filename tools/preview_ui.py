@@ -68,7 +68,7 @@ def make_scan() -> ScanResult:
         ("Google", 6.1, "D:\\_CDrive\\Users\\raoxi\\AppData\\Local\\Google", "local", False, False),
         ("Tencent\\xwechat", 3.4, "D:\\_CDrive\\Users\\raoxi\\AppData\\Roaming\\Tencent\\xwechat", "roaming", False, False),
         ("JetBrains", 16.8, "D:\\_CDrive\\Program Files\\JetBrains", "programfiles", False, False),
-        ("NVIDIA", 2.2, "E:\\CDriveArchive\\C\\NVIDIA", "roaming", False, True),
+        ("NVIDIA", 2.2, "E:\\ColdStore\\C\\NVIDIA", "roaming", False, True),
         ("CodeBuddy CN", 1.9, "D:\\_CDrive\\Users\\raoxi\\AppData\\Roaming\\CodeBuddy CN", "roaming", False, False),
         ("Bionic", 0.8, "E:\\Archive\\Bionic", "programs", True, True),
     ]:
@@ -139,7 +139,7 @@ def make_analysis() -> AnalysisResult:
             ext_bytes=ext_bytes, tier=tier,
             score=94 if tier == TIER_STRONG else 80 if tier == TIER_RECOMMEND else 52,
             reason=reason,
-            dest_path=f"E:\\CDriveArchive\\{drive}\\{rel}",
+            dest_path=f"E:\\ColdStore\\{name}",
             source_drive=drive, is_junction=linked, target_path=target,
         ))
     return AnalysisResult(
@@ -268,7 +268,7 @@ def main() -> int:
         phase="复制文件", percent=47, message="已复制 23.6 GB / 49.8 GB",
         bytes_done=int(23.6 * 1024 ** 3), bytes_total=int(49.8 * 1024 ** 3),
         speed_bps=118 * 1024 ** 2, eta_s=226, item_index=1, item_count=2,
-        detail="E:\\CDriveArchive\\C\\Users\\raoxi\\Videos",
+        detail="E:\\ColdStore\\C\\Users\\raoxi\\Videos",
     ))
     pump(250)
     window.grab().save(str(out / "progress.png"))

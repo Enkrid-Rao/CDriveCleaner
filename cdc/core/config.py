@@ -151,8 +151,8 @@ def _default_archive_root() -> str:
     pool = preferred or drives
     pool.sort(key=lambda d: (d.is_hdd, d.free_bytes), reverse=True)
     if pool:
-        return f"{pool[0].letter}:\\CDriveArchive"
-    return r"D:\CDriveArchive"
+        return f"{pool[0].letter}:\\ColdStore"
+    return r"D:\ColdStore"
 
 
 def _default_config() -> dict[str, Any]:
@@ -174,7 +174,7 @@ def _default_config() -> dict[str, Any]:
             "delete_after_undo": True,
         },
         "appearance": {
-            "font_size": 13,
+            "font_size": 14,
             "motion": True,
             "density": "cozy",
         },
@@ -330,7 +330,7 @@ class Config:
     check_locks: bool = True
     confirm_high_risk: bool = True
     delete_after_undo: bool = True
-    font_size: int = 13
+    font_size: int = 14
     motion: bool = True
     density: str = "cozy"
     log_dir: str = ""
@@ -509,6 +509,14 @@ def load_config(path: str | Path | None = None, *, create: bool = True) -> Confi
             cfg_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
 
     upgraded = _upgrade(raw)
+    # 旧默认名 CDriveArchive 容易误解为“只归档 C 盘数据”；
+    # 新名 ColdStore 与源盘无关。旧目录不存在时自动换成新默认。
+    storage_up = upgraded.setdefault("storage", {})
+    old_archive = _norm(storage_up.get("archive_root", ""))
+    if old_archive and os.path.basename(old_archive).casefold() == "cdrivearchive" \
+            and not os.path.exists(old_archive):
+        storage_up["archive_root"] = os.path.join(
+            os.path.dirname(old_archive), "ColdStore")
     ph = _placeholders(upgraded)
     zones = _resolve_zones(upgraded, ph)
     storage = upgraded.get("storage", {})
@@ -527,13 +535,13 @@ def load_config(path: str | Path | None = None, *, create: bool = True) -> Confi
         warnings.append("迁移根路径不是绝对路径，已回退到 D:\\_CDrive")
         link_root = r"D:\_CDrive"
     if not _is_abs(archive_root):
-        warnings.append("归档根路径不是绝对路径，已回退到 E:\\CDriveArchive")
-        archive_root = r"E:\CDriveArchive"
+        warnings.append("归档根路径不是绝对路径，已回退到 E:\\ColdStore")
+        archive_root = r"E:\ColdStore"
 
     try:
-        font_size = max(10, min(20, int(appearance.get("font_size", 13) or 13)))
+        font_size = max(14, min(20, int(appearance.get("font_size", 14) or 14)))
     except (TypeError, ValueError):
-        font_size = 13
+        font_size = 14
     try:
         width = max(1080, min(2560, int(win.get("width", 1280) or 1280)))
         height = max(700, min(1600, int(win.get("height", 820) or 820)))
