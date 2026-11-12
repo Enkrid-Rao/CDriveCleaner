@@ -1,8 +1,8 @@
 # UTF-8
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(2, 1, 0, 0),
-    prodvers=(2, 1, 0, 0),
+    filevers=(2, 2, 0, 0),
+    prodvers=(2, 2, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -16,12 +16,12 @@ VSVersionInfo(
         '080404b0',
         [StringStruct('CompanyName', 'Enkrid Rao'),
          StringStruct('FileDescription', 'CDriveCleaner - C 盘瘦身与冷数据归档'),
-         StringStruct('FileVersion', '2.1.0'),
+         StringStruct('FileVersion', '2.2.0'),
          StringStruct('InternalName', 'CDriveCleaner'),
          StringStruct('LegalCopyright', 'MIT License'),
          StringStruct('OriginalFilename', 'CDriveCleaner.exe'),
          StringStruct('ProductName', 'CDriveCleaner'),
-         StringStruct('ProductVersion', '2.1.0')])
+         StringStruct('ProductVersion', '2.2.0')])
     ]),
     VarFileInfo([VarStruct('Translation', [2052, 1200])])
   ]

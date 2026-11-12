@@ -24,6 +24,9 @@
     "dir": "",
     "keep_days": 30
   },
+  "updates": {
+    "auto_check": true
+  },
   "zones": {
     "userhome": {
       "source": "{USERPROFILE}",

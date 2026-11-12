@@ -5,8 +5,8 @@
 #
 # 产物：
 #   dist\CDriveCleaner\CDriveCleaner.exe              安装版 / 便携版共用的 onedir 载荷
-#   dist\CDriveCleaner-Portable-v2.1.0.zip            便携版（解压即用）
-#   dist\CDriveCleaner-Setup-v2.1.0.exe               安装版（Inno Setup）
+#   dist\CDriveCleaner-Portable-v2.2.0.zip            便携版（解压即用）
+#   dist\CDriveCleaner-Setup-v2.2.0.exe               安装版（Inno Setup）
 
 param(
     [switch]$SkipInstaller,
@@ -18,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-$version = '2.1.0'
+$version = '2.2.0'
 $dist = Join-Path $root 'dist'
 $payload = Join-Path $dist 'CDriveCleaner'
 $exe = Join-Path $payload 'CDriveCleaner.exe'

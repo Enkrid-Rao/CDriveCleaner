@@ -182,6 +182,9 @@ def _default_config() -> dict[str, Any]:
             "dir": "",
             "keep_days": 30,
         },
+        "updates": {
+            "auto_check": True,
+        },
         "ui": {
             "last_page": "dashboard",
             "window": {"width": 1280, "height": 820},
@@ -335,6 +338,7 @@ class Config:
     density: str = "cozy"
     log_dir: str = ""
     keep_days: int = 30
+    auto_update_check: bool = True
     last_page: str = "dashboard"
     window_size: tuple[int, int] = (1280, 820)
     zones: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -424,6 +428,8 @@ class Config:
         raw.setdefault("logging", {})
         raw["logging"]["dir"] = self.log_dir
         raw["logging"]["keep_days"] = self.keep_days
+        raw.setdefault("updates", {})
+        raw["updates"]["auto_check"] = self.auto_update_check
         raw.setdefault("ui", {})
         raw["ui"]["last_page"] = self.last_page
         raw["ui"]["window"] = {"width": self.window_size[0], "height": self.window_size[1]}
@@ -523,6 +529,7 @@ def load_config(path: str | Path | None = None, *, create: bool = True) -> Confi
     safety = upgraded.get("safety", {})
     appearance = upgraded.get("appearance", {})
     logging_cfg = upgraded.get("logging", {})
+    updates_cfg = upgraded.get("updates", {})
     ui = upgraded.get("ui", {})
     win = ui.get("window", {}) if isinstance(ui.get("window"), dict) else {}
     warnings: list[str] = []
@@ -566,6 +573,7 @@ def load_config(path: str | Path | None = None, *, create: bool = True) -> Confi
         density=str(appearance.get("density") or "cozy"),
         log_dir=str(logging_cfg.get("dir") or ""),
         keep_days=int(logging_cfg.get("keep_days", 30) or 30),
+        auto_update_check=bool(updates_cfg.get("auto_check", True)),
         last_page=str(ui.get("last_page") or "dashboard"),
         window_size=(width, height),
         zones=zones,

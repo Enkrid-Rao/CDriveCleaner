@@ -172,6 +172,30 @@ class SettingsPage(ScrollPage):
             grid.addWidget(card, 1)
         data.add_layout(grid)
 
+        update_row = QHBoxLayout()
+        update_row.setSpacing(10)
+        update_row.addWidget(label("自动检查更新", "Body"))
+        self.auto_update = Toggle(self.state.config.auto_update_check)
+        update_row.addWidget(self.auto_update)
+        self.btn_check_update = QPushButton("检查更新")
+        self.btn_check_update.setObjectName("Ghost")
+        self.btn_check_update.setCursor(Qt.PointingHandCursor)
+        self.btn_check_update.clicked.connect(
+            lambda: self.state.check_updates(manual=True))
+        update_row.addWidget(self.btn_check_update)
+        self.update_status = label("", "Muted")
+        update_row.addWidget(self.update_status)
+        update_row.addStretch()
+        data.body.addLayout(update_row)
+        self.state.update_checking.connect(
+            lambda on: self.update_status.setText("正在检查新版本…" if on else ""))
+        self.state.update_none.connect(
+            lambda v: self.update_status.setText(f"已是最新版本 v{v}"))
+        self.state.update_available.connect(
+            lambda info: self.update_status.setText(f"发现新版本 v{info.version}"))
+        self.state.update_error.connect(
+            lambda _e: self.update_status.setText("检查失败，请稍后重试"))
+
         info = QHBoxLayout()
         info.setSpacing(10)
         info.addWidget(label(f"版本 {__version__}  ·  {paths.app_label()}", "Muted"))
@@ -205,6 +229,7 @@ class SettingsPage(ScrollPage):
         self.font_slider.setValue(cfg.font_size)
         self.font_value.setText(f"{cfg.font_size} px")
         self.motion.setChecked(cfg.motion)
+        self.auto_update.setChecked(cfg.auto_update_check)
 
     def _save(self) -> None:
         cfg = self.state.config
@@ -238,6 +263,7 @@ class SettingsPage(ScrollPage):
         cfg.delete_after_undo = self.delete_after_undo.isChecked()
         cfg.font_size = self.font_slider.value()
         cfg.motion = self.motion.isChecked()
+        cfg.auto_update_check = self.auto_update.isChecked()
         cfg.raw.setdefault("safety", {})["keep_manifests"] = self.keep_manifests.value()
         try:
             cfg.save()

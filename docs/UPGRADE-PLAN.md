@@ -1,6 +1,6 @@
 # CDriveCleaner v2 重构与升级方案
 
-> 状态：**已实现（v2.1.0）**（本文是 v2 的实施纲领；实际代码与验证记录见 PLAN.md / CHANGELOG.md）
+> 状态：**已实现（v2.2.0）**（本文是 v2 的实施纲领；实际代码与验证记录见 PLAN.md / CHANGELOG.md）
 >
 > 目标：把「C 盘大目录 → D 盘 Junction」的单点工具，升级为
 > **系统盘空间管理 + 冷数据归档**的一体化桌面应用，并彻底重做交互与视觉。
@@ -123,8 +123,8 @@ helper 执行并写 `progress.json` / `result.json` → GUI 300ms 轮询。
 
 | 产物 | 方式 | 说明 |
 |---|---|---|
-| `CDriveCleaner-Setup-v2.1.0.exe` | Inno Setup 6 | 安装版：开始菜单 + 桌面快捷方式 + 卸载；默认当前用户安装，可选所有用户 |
-| `CDriveCleaner-Portable-v2.1.0.zip` | PyInstaller onedir + `portable.flag` | 解压即用，配置/日志在 `data/`，可放 U 盘 |
+| `CDriveCleaner-Setup-v2.2.0.exe` | Inno Setup 6 | 安装版：开始菜单 + 桌面快捷方式 + 卸载；默认当前用户安装，可选所有用户 |
+| `CDriveCleaner-Portable-v2.2.0.zip` | PyInstaller onedir + `portable.flag` | 解压即用，配置/日志在 `data/`，可放 U 盘 |
 
 - PyInstaller onedir（启动快、Qt 加载稳定），`--windowed`，带版本资源与图标。
 - 构建脚本：`packaging/build.ps1`（清理 → 构建 → 便携包 → 安装包 → SHA256）。

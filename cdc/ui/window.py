@@ -6,7 +6,7 @@ import os
 import random
 from typing import Any
 
-from PySide6.QtCore import QPoint, QRectF, Qt
+from PySide6.QtCore import QPoint, QRectF, Qt, QTimer
 from PySide6.QtGui import (
     QColor, QIcon, QLinearGradient, QPainter, QPaintEvent, QRadialGradient,
     QShortcut, QKeySequence,
@@ -26,6 +26,7 @@ from .pages.links import LinksPage
 from .pages.settings import SettingsPage
 from .pages.slimming import SlimmingPage
 from .state import AppState
+from .update_dialog import UpdateBanner, show_update_dialog
 from .widgets import ConfirmDialog, Pill, ProgressOverlay, Toast, label
 
 
@@ -227,6 +228,8 @@ class MainWindow(ResizableFrameless, QMainWindow):
         right_layout.setSpacing(0)
         self.titlebar = TitleBar(self)
         right_layout.addWidget(self.titlebar)
+        self.update_banner = UpdateBanner()
+        right_layout.addWidget(self.update_banner)
         self.stack = QStackedWidget()
         self.stack.setObjectName("PageRoot")
         right_layout.addWidget(self.stack, 1)
@@ -258,6 +261,13 @@ class MainWindow(ResizableFrameless, QMainWindow):
         self.state.operation_failed.connect(self._on_operation_failed)
         self.state.operation_busy.connect(self._on_busy)
         self.state.config_changed.connect(self._apply_style)
+        self.state.update_available.connect(self._on_update_available)
+        self.state.update_none.connect(
+            lambda v: Toast.show_message(self, f"已是最新版本 v{v}", "success"))
+        self.state.update_error.connect(
+            lambda e: Toast.show_message(self, f"检查更新失败：{e}", "warn"))
+        self.update_banner.view_requested.connect(self._open_update)
+        self.update_banner.dismissed.connect(self._dismiss_update)
         self.state.scan_started.connect(lambda: self.titlebar.set_activity("扫描中"))
         self.state.scan_finished.connect(lambda _r: self.titlebar.set_activity(""))
         self.state.scan_failed.connect(lambda _e: self.titlebar.set_activity(""))
@@ -274,6 +284,7 @@ class MainWindow(ResizableFrameless, QMainWindow):
         start = state.config.last_page if state.config.last_page in self.pages else "dashboard"
         self.navigate(start, refresh=True)
         self._center()
+        QTimer.singleShot(2600, lambda: self.state.check_updates(False))
 
     # ---------- 布局 ----------
 
@@ -388,6 +399,23 @@ class MainWindow(ResizableFrameless, QMainWindow):
         app.setStyleSheet(theme.build_qss(cfg.font_size, cfg.motion))
         theme.set_motion(cfg.motion)
         self.titlebar.set_admin(self.state.is_admin)
+
+    # ---------- 自动更新 ----------
+
+    def _on_update_available(self, info) -> None:
+        self.update_banner.set_info(info)
+        self.update_banner.show()
+
+    def _open_update(self) -> None:
+        info = self.state.update_info
+        if info is not None:
+            show_update_dialog(self, info)
+
+    def _dismiss_update(self) -> None:
+        self.update_banner.hide()
+        info = self.state.update_info
+        if info is not None:
+            self.state.skip_update(info.version)
 
     # ---------- 关闭 ----------
 

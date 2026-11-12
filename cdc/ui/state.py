@@ -11,7 +11,7 @@ from typing import Any
 from PySide6.QtCore import QObject, QThread, QTimer, Signal
 
 from .. import paths
-from ..core import applog, jobs, scanner, windows
+from ..core import applog, jobs, scanner, updater, windows
 from ..core.config import Config, load_config
 from ..core.models import (
     ACTION_ARCHIVE, ACTION_CLEAN, ACTION_MIGRATE, ACTION_RESTORE, ACTION_UNDO,
@@ -116,6 +116,18 @@ class OperationWorker(QThread):
             self.failed.emit(f"{exc}")
 
 
+class UpdateCheckWorker(QThread):
+    result_ready = Signal(object)
+    failed = Signal(str)
+
+    def run(self) -> None:
+        try:
+            info = updater.check_for_update(__version__)
+            self.result_ready.emit(info)
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
 class ElevatedController(QObject):
     """轮询提权 helper 的 job/progress/result 文件。"""
 
@@ -209,6 +221,10 @@ class AppState(QObject):
     toast = Signal(str, str)
     navigate = Signal(str)
     config_changed = Signal()
+    update_available = Signal(object)
+    update_none = Signal(str)
+    update_error = Signal(str)
+    update_checking = Signal(bool)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -225,6 +241,8 @@ class AppState(QObject):
         self._analysis_worker: AnalysisWorker | None = None
         self._op_worker: OperationWorker | None = None
         self._elevated: ElevatedController | None = None
+        self._update_worker: UpdateCheckWorker | None = None
+        self.update_info = None
         self._load_cache()
         applog.log("INFO", f"启动 CDriveCleaner {__version__} · 数据目录 {paths.data_dir()}")
         if self.config.warnings:
@@ -260,6 +278,50 @@ class AppState(QObject):
         self.config = load_config()
         self.config_changed.emit()
         return self.config
+
+    # ---------- 自动更新 ----------
+
+    def check_updates(self, manual: bool = False) -> None:
+        if self._update_worker is not None and self._update_worker.isRunning():
+            return
+        if not manual:
+            if paths.is_source_checkout():
+                return
+            if not self.config.auto_update_check:
+                return
+            if not updater.should_auto_check():
+                return
+        self.update_checking.emit(True)
+        worker = UpdateCheckWorker(self)
+        worker.result_ready.connect(lambda info: self._on_update_result(info, manual))
+        worker.failed.connect(lambda err: self._on_update_error(err, manual))
+        worker.finished.connect(worker.deleteLater)
+        self._update_worker = worker
+        worker.start()
+
+    def _on_update_result(self, info, manual: bool) -> None:
+        self.update_checking.emit(False)
+        updater.mark_checked()
+        self._update_worker = None
+        if info is None:
+            if manual:
+                self.update_none.emit(__version__)
+            return
+        if not manual and updater.skipped_version() == info.version:
+            return
+        self.update_info = info
+        applog.log("INFO", f"发现新版本 {info.version}")
+        self.update_available.emit(info)
+
+    def _on_update_error(self, error: str, manual: bool) -> None:
+        self.update_checking.emit(False)
+        self._update_worker = None
+        applog.log("WARN", f"检查更新失败：{error}")
+        if manual:
+            self.update_error.emit(error)
+
+    def skip_update(self, version: str) -> None:
+        updater.mark_skipped(version)
 
     # ---------- 缓存 ----------
 
@@ -485,7 +547,8 @@ class AppState(QObject):
         self.cancel_scan()
         self.cancel_analysis()
         self.cancel_operation()
-        for worker in (self._scan_worker, self._analysis_worker, self._op_worker):
+        for worker in (self._scan_worker, self._analysis_worker, self._op_worker,
+                       self._update_worker):
             if worker is not None:
                 try:
                     if worker.isRunning():
@@ -497,3 +560,4 @@ class AppState(QObject):
         self._scan_worker = None
         self._analysis_worker = None
         self._op_worker = None
+        self._update_worker = None
