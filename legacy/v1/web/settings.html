@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>C盘瘦身助手 · 设置（设计稿）</title>
+<style>
+  :root {
+    --bg-0: #070b14;
+    --bg-1: #0b1120;
+    --panel: rgba(17, 24, 39, 0.55);
+    --panel-solid: #0f172a;
+    --line: rgba(125, 160, 255, 0.16);
+    --line-strong: rgba(139, 92, 246, 0.45);
+    --brand: #6366f1;
+    --brand-2: #8b5cf6;
+    --text: #e6edf3;
+    --muted: #8b97a7;
+    --accent: #2dd4bf;
+    --danger: #f85149;
+    --warn: #d29922;
+    --mono: "JetBrains Mono", "Consolas", "Cascadia Code", monospace;
+    --ui: -apple-system, "Microsoft YaHei UI", "PingFang SC", "Segoe UI", sans-serif;
+    --radius: 12px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: var(--ui);
+    color: var(--text);
+    background:
+      radial-gradient(1200px 600px at 12% -8%, rgba(99, 102, 241, 0.18), transparent 60%),
+      radial-gradient(1000px 520px at 110% 8%, rgba(139, 92, 246, 0.14), transparent 55%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-0));
+    min-height: 100vh;
+  }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* ===== 侧边导航 ===== */
+  .sidebar {
+    width: 232px; flex: 0 0 232px;
+    padding: 22px 14px;
+    background: var(--panel);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; padding: 4px 8px 18px; }
+  .brand .logo {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    display: grid; place-items: center; color: #fff; font-size: 17px;
+    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+  }
+  .brand .title { font-weight: 800; font-size: 15px; }
+  .brand .ver { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .nav-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 11px 14px; border: 1px solid transparent; border-radius: 11px;
+    color: var(--muted); font-weight: 600; font-size: 13.5px;
+    cursor: pointer; user-select: none;
+    transition: background .18s, color .18s, border-color .18s;
+  }
+  .nav-item .ico { font-size: 16px; width: 20px; text-align: center; }
+  .nav-item:hover { background: rgba(36, 48, 74, 0.7); color: var(--text); }
+  .nav-item.active {
+    color: #fff; border-color: var(--line-strong);
+    background: linear-gradient(135deg, rgba(99,102,241,0.30), rgba(139,92,246,0.30));
+  }
+  .nav-spacer { flex: 1; }
+
+  /* ===== 内容区 ===== */
+  .content { flex: 1; min-width: 0; overflow-y: auto; padding: 30px 38px 110px; }
+  .page-head { margin-bottom: 22px; }
+  .page-head h1 { margin: 0 0 6px; font-size: 22px; font-weight: 800; }
+  .page-head p { margin: 0; color: var(--muted); font-size: 13px; }
+
+  .section { display: none; }
+  .section.active { display: block; animation: fade .22s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .card {
+    background: var(--panel);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 6px 20px;
+    margin-bottom: 18px;
+  }
+
+  /* 设置行：左标签/提示，右控件 */
+  .row {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;
+    padding: 18px 4px;
+    border-bottom: 1px solid rgba(125, 160, 255, 0.08);
+  }
+  .row:last-child { border-bottom: none; }
+  .row .meta { flex: 1; min-width: 0; }
+  .row .meta .r-title { font-size: 13.5px; font-weight: 600; }
+  .row .meta .r-hint { font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+  .row .ctrl { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; max-width: 60%; }
+
+  /* ===== 控件：输入框清晰可见 ===== */
+  .field-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: block; font-weight: 600; }
+  input[type="text"], input[type="number"], select {
+    width: 100%;
+    background: rgba(11, 17, 32, 0.9);
+    border: 1.5px solid rgba(125, 160, 255, 0.28);
+    border-radius: 9px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-size: 13px; font-family: var(--ui);
+    outline: none;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+  }
+  input[type="text"]:hover, input[type="number"]:hover, select:hover { border-color: rgba(125, 160, 255, 0.5); }
+  input[type="text"]:focus, input[type="number"]:focus, select:focus {
+    border-color: var(--brand-2);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.22);
+    background: rgba(11, 17, 32, 1);
+  }
+  input::placeholder { color: #5d6776; }
+  /* 下拉箭头清晰可见 */
+  select {
+    appearance: none; -webkit-appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, #8b95a7 50%), linear-gradient(135deg, #8b95a7 50%, transparent 50%);
+    background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 34px; cursor: pointer;
+  }
+  select:hover { background-image: linear-gradient(45deg, transparent 50%, #c7d2fe 50%), linear-gradient(135deg, #c7d2fe 50%, transparent 50%); }
+
+  .input-group { display: flex; flex-direction: column; gap: 6px; max-width: 320px; }
+  .input-row { display: flex; gap: 8px; align-items: center; }
+
+  .btn {
+    border: 1px solid var(--line); background: rgba(36, 48, 74, 0.5);
+    color: var(--text); border-radius: 9px; padding: 9px 14px;
+    font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    transition: background .15s, border-color .15s, transform .05s;
+  }
+  .btn:hover { background: rgba(36, 48, 74, 0.85); border-color: var(--line-strong); }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    border: none; box-shadow: 0 8px 22px rgba(99, 102, 241, 0.4);
+  }
+  .btn.primary:hover { filter: brightness(1.07); }
+
+  /* 滑块 */
+  .slider-wrap { display: flex; align-items: center; gap: 14px; }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 240px; max-width: 100%; height: 6px; border-radius: 3px;
+    background: rgba(125, 160, 255, 0.16); outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, #ffffff, #c7d2fe);
+    border: 2px solid var(--brand-2); cursor: pointer;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.55);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, #ffffff, #c7d2fe);
+    border: 2px solid var(--brand-2); cursor: pointer;
+  }
+  .slider-val { font-family: var(--mono); font-weight: 700; color: var(--brand-2); font-size: 13px; min-width: 64px; }
+
+  .preview { font-family: var(--mono); font-size: 11.5px; color: var(--accent); margin-top: 7px; word-break: break-all; }
+  .warn { font-size: 11.5px; color: var(--warn); margin-top: 6px; }
+  .err  { font-size: 11.5px; color: var(--danger); font-weight: 600; margin-top: 6px; }
+
+  .font-preview {
+    margin-top: 8px; background: rgba(7, 11, 20, 0.6);
+    border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
+  }
+  .font-preview .fp-hint { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .font-preview .fp-sample { font-size: 15px; font-weight: 700; color: var(--text); }
+
+  .footer {
+    position: fixed; left: 232px; right: 0; bottom: 0;
+    background: rgba(11, 17, 32, 0.72);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border-top: 1px solid var(--line);
+    padding: 14px 38px; display: flex; align-items: center; gap: 12px;
+  }
+  .footer .hint { color: var(--muted); font-size: 12px; flex: 1; }
+
+  @media (max-width: 760px) {
+    .app { flex-direction: column; }
+    .sidebar { width: 100%; flex: none; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--line); padding: 12px; }
+    .brand { display: none; } .nav-spacer { display: none; } .nav-item { white-space: nowrap; }
+    .content { padding: 22px 18px 120px; }
+    .row { flex-direction: column; align-items: stretch; gap: 12px; }
+    .row .ctrl { max-width: 100%; width: 100%; }
+    .input-group { max-width: 100%; }
+    input[type="range"] { width: 100%; }
+    .footer { left: 0; padding: 14px 18px; }
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">⚙</div>
+        <div>
+          <div class="title">设置</div>
+          <div class="ver">v0.4.0 · 设计稿</div>
+        </div>
+      </div>
+      <div class="nav-item active" data-page="general"><span class="ico">🧩</span>通用</div>
+      <div class="nav-item" data-page="logging"><span class="ico">📝</span>日志</div>
+      <div class="nav-item" data-page="appearance"><span class="ico">🎨</span>外观</div>
+      <div class="nav-spacer"></div>
+    </aside>
+
+    <main class="content">
+      <!-- 通用 -->
+      <section class="section active" id="general">
+        <div class="page-head">
+          <h1>通用设置</h1>
+          <p>迁移阈值、目标位置与 Web 服务端口</p>
+        </div>
+
+        <div class="card">
+          <div class="row">
+            <div class="meta">
+              <div class="r-title">清理阈值</div>
+              <div class="r-hint">仅展示 / 迁移超过该大小的目录。</div>
+            </div>
+            <div class="ctrl">
+              <div class="slider-wrap">
+                <input type="range" id="threshold" min="0" max="2048" step="10" value="100" />
+                <span class="slider-val" id="thresholdVal">100 MB</span>
+              </div>
+              <input type="number" id="thresholdNum" min="0" max="2048" step="10" value="100" style="width:96px" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="meta">
+              <div class="r-title">目标目录</div>
+              <div class="r-hint">迁移数据的存放根路径。支持盘符或任意子目录。</div>
+            </div>
+            <div class="ctrl" style="flex-direction:column; align-items:stretch; max-width:60%;">
+              <div class="input-row">
+                <input type="text" id="target" placeholder="例如 D:\ 或 D:\Junctions" value="D:" style="flex:1;" />
+                <button class="btn" id="browse">浏览</button>
+              </div>
+              <div class="preview" id="targetPreview"></div>
+              <div class="warn" id="targetWarn"></div>
+              <div class="err" id="targetErr"></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="meta">
+              <div class="r-title">临时文件保留天数</div>
+              <div class="r-hint">清理 Temp 时，仅删除超过该天数的文件。0 表示全部清理。</div>
+            </div>
+            <div class="ctrl">
+              <input type="number" id="tempDays" min="0" max="365" value="1" style="width:104px" />
+              <span style="color:var(--muted);font-size:12px;">天</span>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="meta">
+              <div class="r-title">Web 服务端口</div>
+              <div class="r-hint">Web 模式（--web）启动时使用的端口。</div>
+            </div>
+            <div class="ctrl">
+              <input type="number" id="port" min="1" max="65535" value="8765" style="width:114px" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 日志 -->
+      <section class="section" id="logging">
+        <div class="page-head">
+          <h1>日志设置</h1>
+          <p>操作日志的保存位置</p>
+        </div>
+        <div class="card">
+          <div class="row">
+            <div class="meta">
+              <div class="r-title">日志保存目录</div>
+              <div class="r-hint">操作日志按天写入该目录。留空使用默认位置。</div>
+            </div>
+            <div class="ctrl" style="flex-direction:column; align-items:stretch; max-width:60%;">
+              <div class="input-row">
+                <input type="text" id="logDir" placeholder="留空则使用程序目录下 logs\" style="flex:1;" />
+                <button class="btn" id="browseLog">浏览</button>
+              </div>
+              <div class="preview" id="logResolved"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 外观 -->
+      <section class="section" id="appearance">
+        <div class="page-head">
+          <h1>外观设置</h1>
+          <p>界面字体与字号（改动即时预览）</p>
+        </div>
+        <div class="card">
+          <div class="row">
+            <div class="meta">
+              <div class="r-title">界面字体</div>
+              <div class="r-hint">推荐 JetBrains Mono（等宽、极客感、数字对齐不抖动）。</div>
+            </div>
+            <div class="ctrl" style="max-width:60%;">
+              <div class="input-group" style="max-width:100%;">
+                <select id="fontFamily">
+                  <option value="">自动（推荐 JetBrains Mono）</option>
+                  <option value="JetBrains Mono">JetBrains Mono</option>
+                  <option value="Consolas">Consolas</option>
+                  <option value="Microsoft YaHei UI">Microsoft YaHei UI</option>
+                  <option value="Cascadia Code">Cascadia Code</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="meta">
+              <div class="r-title">字号</div>
+              <div class="r-hint">基础字号，部分标题会更大。</div>
+            </div>
+            <div class="ctrl">
+              <div class="slider-wrap">
+                <input type="range" id="fontSize" min="9" max="20" step="1" value="13" />
+                <span class="slider-val" id="fontSizeVal">13 px</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="font-preview">
+            <div class="fp-hint">预览</div>
+            <div class="fp-sample" id="fontSample">磁盘概览  ·  C盘可用 128.4 GB  ·  可释放 12.8 GB</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="footer">
+    <span class="hint">改动即时生效预览，保存后写入 config.json 并热重载。</span>
+    <button class="btn" id="cancel">取消</button>
+    <button class="btn primary" id="save">保存并应用</button>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // 导航切换
+  document.querySelectorAll('.nav-item').forEach((el) => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      el.classList.add('active');
+      $(el.dataset.page).classList.add('active');
+    });
+  });
+
+  // 阈值联动
+  const thr = $('threshold'), thrNum = $('thresholdNum'), thrVal = $('thresholdVal');
+  function syncThreshold(v) {
+    v = Math.max(0, Math.min(2048, v | 0));
+    thr.value = v; thrNum.value = v; thrVal.textContent = v + ' MB';
+  }
+  thr.addEventListener('input', () => syncThreshold(+thr.value));
+  thrNum.addEventListener('input', () => syncThreshold(+thrNum.value));
+
+  // 目标目录校验
+  function checkTarget() {
+    const raw = $('target').value.trim();
+    const norm = raw.replace(/\\+$/, '') || (raw ? raw : '');
+    const preview = $('targetPreview'), warn = $('targetWarn'), err = $('targetErr');
+    preview.textContent = ''; warn.textContent = ''; err.textContent = '';
+    if (!raw) { err.textContent = '❌ 目标目录不能为空'; return false; }
+    if (/^c:/i.test(norm)) {
+      if (norm.replace(/\\+$/,'').toUpperCase() === 'C:') {
+        err.textContent = '❌ 不能把数据迁移到 C 盘（与源盘相同，无意义且有风险）'; return false;
+      }
+      warn.textContent = '⚠️ 目标在 C 盘，建议改用其他盘（如 D:\\Junctions）'; return false;
+    }
+    if (!/^[a-z]:/i.test(norm) && !norm.startsWith('\\\\')) {
+      err.textContent = '❌ 请输入绝对路径（如 D:\\ 或 D:\\Junctions）'; return false;
+    }
+    preview.textContent = '实际存放路径示例：' + norm + '\\AppData\\Local';
+    return true;
+  }
+  $('target').addEventListener('input', checkTarget);
+
+  // 日志目录解析预览
+  function checkLog() {
+    const raw = $('logDir').value.trim();
+    $('logResolved').textContent = raw
+      ? '当前：' + raw.replace(/\{USERPROFILE\}/g, 'C:\\Users\\raoxi')
+      : '当前：程序目录下的 logs\\';
+  }
+  $('logDir').addEventListener('input', checkLog);
+  checkLog();
+
+  // 字体实时预览
+  const ff = $('fontFamily'), fs = $('fontSize'), fsVal = $('fontSizeVal'), sample = $('fontSample');
+  function syncFont() {
+    const fam = ff.value || 'JetBrains Mono';
+    const size = +fs.value;
+    sample.style.fontFamily = '"' + fam + '", "Microsoft YaHei UI", sans-serif';
+    sample.style.fontSize = size + 'px';
+    fsVal.textContent = size + ' px';
+  }
+  ff.addEventListener('change', syncFont);
+  fs.addEventListener('input', syncFont);
+  syncFont();
+
+  // 保存（原型）
+  $('save').addEventListener('click', () => {
+    if (!checkTarget()) { alert('目标目录无效，请修正后再保存。'); return; }
+    const cfg = {
+      threshold_mb: +thr.value,
+      target_base: $('target').value.trim(),
+      temp_retention_days: +$('tempDays').value,
+      port: +$('port').value,
+      log_dir: $('logDir').value.trim(),
+      ui: { font_family: ff.value, font_size: +fs.value }
+    };
+    console.log('保存配置（原型）：', cfg);
+    alert('已保存（原型演示）：\n' + JSON.stringify(cfg, null, 2));
+  });
+  $('cancel').addEventListener('click', () => alert('已取消（原型演示）'));
+  checkTarget();
+</script>
+</body>
+</html>

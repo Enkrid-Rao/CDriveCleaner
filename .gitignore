@@ -30,13 +30,22 @@ ENV/
 *.manifest
 build/
 dist/
+build_pyinstaller.log
 
-# Runtime-generated files (powershell.py / admin_ops.py create these on the fly)
-_temp_script.ps1
+# Runtime data (v2)
+state/
+data/
+logs/
 _admin_result_*.txt
 Admin-*-*.bat
 _empty/
-logs/
+.cdc-origin.json
+
+# Local config backups / crash dumps
+config.json.broken-*
+config.json.tmp
+*.bak-20*
+*.broken-*
 
 # IDE
 .idea/
@@ -51,3 +60,6 @@ Desktop.ini
 
 # WorkBuddy internal
 .workbuddy/
+
+# PyInstaller / PowerShell temp
+_temp_script.ps1

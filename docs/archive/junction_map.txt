@@ -1,0 +1,51 @@
+﻿C:\Program Files\JetBrains	D:\Program Files\JetBrains	D:\_CDrive\Program Files\JetBrains
+C:\ProgramData\Blackmagic Design	D:\ProgramData\Blackmagic Design	D:\_CDrive\ProgramData\Blackmagic Design
+C:\Users\raoxi\.cache	D:\Cache\dotcache	D:\_CDrive\Users\raoxi\.cache
+C:\Users\raoxi\AppData\Local\@genieworkbuddy-desktop-updater	D:\AppData\Local\@genieworkbuddy-desktop-updater	D:\_CDrive\Users\raoxi\AppData\Local\@genieworkbuddy-desktop-updater
+C:\Users\raoxi\AppData\Local\@promaelectron-updater	D:\AppData\Local\@promaelectron-updater	D:\_CDrive\Users\raoxi\AppData\Local\@promaelectron-updater
+C:\Users\raoxi\AppData\Local\Adobe	D:\AppData\Local\Adobe	D:\_CDrive\Users\raoxi\AppData\Local\Adobe
+C:\Users\raoxi\AppData\Local\Doubao	D:\AppData\Local\Doubao	D:\_CDrive\Users\raoxi\AppData\Local\Doubao
+C:\Users\raoxi\AppData\Local\electron-fiddle	D:\AppData\Local\electron-fiddle	D:\_CDrive\Users\raoxi\AppData\Local\electron-fiddle
+C:\Users\raoxi\AppData\Local\fiddler-everywhere-updater	D:\AppData\Local\fiddler-everywhere-updater	D:\_CDrive\Users\raoxi\AppData\Local\fiddler-everywhere-updater
+C:\Users\raoxi\AppData\Local\FlowLauncher	D:\AppData\Others\FlowLauncher	D:\_CDrive\Users\raoxi\AppData\Local\FlowLauncher
+C:\Users\raoxi\AppData\Local\Google	D:\AppData\Chrome	D:\_CDrive\Users\raoxi\AppData\Local\Google
+C:\Users\raoxi\AppData\Local\Huawei	D:\AppData\Local\Huawei	D:\_CDrive\Users\raoxi\AppData\Local\Huawei
+C:\Users\raoxi\AppData\Local\JianyingPro	D:\AppData\JianyingPro	D:\_CDrive\Users\raoxi\AppData\Local\JianyingPro
+C:\Users\raoxi\AppData\Local\mineru-updater	D:\AppData\mineru	D:\_CDrive\Users\raoxi\AppData\Local\mineru-updater
+C:\Users\raoxi\AppData\Local\moekoemusic-updater	D:\AppData\Local\moekoemusic-updater	D:\_CDrive\Users\raoxi\AppData\Local\moekoemusic-updater
+C:\Users\raoxi\AppData\Local\NGR	D:\AppData\Local\NGR	D:\_CDrive\Users\raoxi\AppData\Local\NGR
+C:\Users\raoxi\AppData\Local\npm-cache	D:\Cache\npm	D:\_CDrive\Users\raoxi\AppData\Local\npm-cache
+C:\Users\raoxi\AppData\Local\nvm	D:\AppData\nvm	D:\_CDrive\Users\raoxi\AppData\Local\nvm
+C:\Users\raoxi\AppData\Local\OfficePLUS	D:\AppData\Local\OfficePLUS	D:\_CDrive\Users\raoxi\AppData\Local\OfficePLUS
+C:\Users\raoxi\AppData\Local\OpenHarmony	D:\AppData\Local\OpenHarmony	D:\_CDrive\Users\raoxi\AppData\Local\OpenHarmony
+C:\Users\raoxi\AppData\Local\Pandoc	D:\AppData\Local\Pandoc	D:\_CDrive\Users\raoxi\AppData\Local\Pandoc
+C:\Users\raoxi\AppData\Local\pip	D:\AppData\Local\pip	D:\_CDrive\Users\raoxi\AppData\Local\pip
+C:\Users\raoxi\AppData\Local\Programs\Fiddler Everywhere	D:\AppData\Programs\Fiddler Everywhere	D:\_CDrive\Users\raoxi\AppData\Local\Programs\Fiddler Everywhere
+C:\Users\raoxi\AppData\Local\Programs\Microsoft VS Code	D:\AppData\Programs\Microsoft VS Code	D:\_CDrive\Users\raoxi\AppData\Local\Programs\Microsoft VS Code
+C:\Users\raoxi\AppData\Local\Programs\MiKTeX	D:\AppData\Programs\MiKTeX	D:\_CDrive\Users\raoxi\AppData\Local\Programs\MiKTeX
+C:\Users\raoxi\AppData\Local\Programs\Python	D:\AppData\Programs\Python	D:\_CDrive\Users\raoxi\AppData\Local\Programs\Python
+C:\Users\raoxi\AppData\Local\Programs\Quark	D:\AppData\Programs\Quark	D:\_CDrive\Users\raoxi\AppData\Local\Programs\Quark
+C:\Users\raoxi\AppData\Local\Programs\QuickLook	D:\AppData\Programs\QuickLook	D:\_CDrive\Users\raoxi\AppData\Local\Programs\QuickLook
+C:\Users\raoxi\AppData\Local\Programs\SakuraCat	D:\AppData\Programs\SakuraCat	D:\_CDrive\Users\raoxi\AppData\Local\Programs\SakuraCat
+C:\Users\raoxi\AppData\Local\Programs\token-monitor	D:\AppData\Programs\token-monitor	D:\_CDrive\Users\raoxi\AppData\Local\Programs\token-monitor
+C:\Users\raoxi\AppData\Local\Programs\Trae	D:\AppData\Programs\Trae	D:\_CDrive\Users\raoxi\AppData\Local\Programs\Trae
+C:\Users\raoxi\AppData\Local\Programs\Xmind	D:\AppData\Programs\Xmind	D:\_CDrive\Users\raoxi\AppData\Local\Programs\Xmind
+C:\Users\raoxi\AppData\Local\Quark	D:\AppData\Others\Quark	D:\_CDrive\Users\raoxi\AppData\Local\Quark
+C:\Users\raoxi\AppData\Local\Steam	D:\Cache\Steam	D:\_CDrive\Users\raoxi\AppData\Local\Steam
+C:\Users\raoxi\AppData\Local\uv	D:\Cache\uv	D:\_CDrive\Users\raoxi\AppData\Local\uv
+C:\Users\raoxi\AppData\Local\WorkBuddyExtension	D:\AppData\Local\WorkBuddyExtension	D:\_CDrive\Users\raoxi\AppData\Local\WorkBuddyExtension
+C:\Users\raoxi\AppData\Local\xmind-updater	D:\AppData\Local\xmind-updater	D:\_CDrive\Users\raoxi\AppData\Local\xmind-updater
+C:\Users\raoxi\AppData\Roaming\Adobe	D:\AppData\Others\Adobe	D:\_CDrive\Users\raoxi\AppData\Roaming\Adobe
+C:\Users\raoxi\AppData\Roaming\bilibili	D:\AppData\bilibili	D:\_CDrive\Users\raoxi\AppData\Roaming\bilibili
+C:\Users\raoxi\AppData\Roaming\Code	D:\AppData\VSCode	D:\_CDrive\Users\raoxi\AppData\Roaming\Code
+C:\Users\raoxi\AppData\Roaming\CodeBuddy CN	D:\AppData\Others\CodeBuddyCN	D:\_CDrive\Users\raoxi\AppData\Roaming\CodeBuddy CN
+C:\Users\raoxi\AppData\Roaming\Huawei	D:\AppData\Roaming\Huawei	D:\_CDrive\Users\raoxi\AppData\Roaming\Huawei
+C:\Users\raoxi\AppData\Roaming\IDM	D:\AppData\Roaming\IDM	D:\_CDrive\Users\raoxi\AppData\Roaming\IDM
+C:\Users\raoxi\AppData\Roaming\moekoemusic	D:\AppData\Roaming\moekoemusic	D:\_CDrive\Users\raoxi\AppData\Roaming\moekoemusic
+C:\Users\raoxi\AppData\Roaming\NVIDIA	D:\AppData\Others\NVIDIA	D:\_CDrive\Users\raoxi\AppData\Roaming\NVIDIA
+C:\Users\raoxi\AppData\Roaming\Qwen	D:\AppData\Roaming\Qwen	D:\_CDrive\Users\raoxi\AppData\Roaming\Qwen
+C:\Users\raoxi\AppData\Roaming\Tencent\WeMeet	D:\AppData\TencentMeeting	D:\_CDrive\Users\raoxi\AppData\Roaming\Tencent\WeMeet
+C:\Users\raoxi\AppData\Roaming\Tencent\xwechat	D:\AppData\WeChat	D:\_CDrive\Users\raoxi\AppData\Roaming\Tencent\xwechat
+C:\Users\raoxi\AppData\Roaming\WorkBuddy	D:\AppData\WorkBuddy	D:\_CDrive\Users\raoxi\AppData\Roaming\WorkBuddy
+C:\Users\raoxi\AppData\Roaming\ZTools	D:\AppData\Roaming\ZTools	D:\_CDrive\Users\raoxi\AppData\Roaming\ZTools
+C:\Users\raoxi\Pictures\Screenshots	D:\Media\Pictures\Screenshots	D:\_CDrive\Users\raoxi\Pictures\Screenshots

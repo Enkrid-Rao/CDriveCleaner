@@ -1,39 +1,42 @@
 # Changelog
 
-本文件记录 CDriveCleaner 的所有重要变更。
+## [2.0.0] - 2026-11-12
 
-格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
-版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
+### 新增
 
-## [Unreleased]
+- **冷数据归档**：按 IO 特征识别电影 / 镜像 / 安装包 / 模型 / 压缩包 / 照片素材，
+  支持移动、链接、仅复制三种模式。
+- **已链接冷数据二次归档**：C 盘 Junction 数据可从 D 盘再归档到机械盘，
+  并自动把 C 盘链接改指到新目标。
+- **链接管理页**：查看全部 Junction、目标缺失 / 外置盘标记、撤销迁移、移除死链。
+- **操作记录页**：结构化审计（`audit.jsonl`）、详情、撤销 / 回迁、CSV 导出、运行日志。
+- **提权 helper**：一次 UAC 执行整批管理员操作，GUI 实时读取进度。
+- **物理盘识别**：区分 SSD / HDD / USB，显示 C/D 是否同盘。
+- **安装版与便携版**：Inno Setup 安装包 + PyInstaller onedir 便携 zip。
 
-### 已完成
-- 去硬编码：动态获取用户名/路径（`os.getenv('USERPROFILE')`/`USERNAME`/`TEMP`），支持任意 Windows 环境
-- Junction 扫描输出完整 source 路径，前端不再猜路径
-- 启动脚本去除 WorkBuddy 私人 Python 路径，改用系统 `python`
-- 配置文件 `config.json`：zone 规则、阈值、端口、Temp 保留天数可配置，支持 `{USERPROFILE}` 占位符
-- 架构重构：781 行单文件拆分为 7 个模块（`config/powershell/scanner/migrator/admin_ops/web_api/__main__`）
-- 启动方式改为 `python -m src`（包模式，支持相对导入）
+### 升级
 
-### 计划中
-- 安全加固：文件日志、迁移前快照、自动回滚机制
-- PyInstaller 打包为单 exe
-- GitHub Actions 自动构建
+- 全新 PySide6 UI：极光玻璃设计、侧边栏 6 页、环形仪表、三盘拓扑、
+  批量选择、确认弹窗、全屏进度面板、Toast。
+- 扫描：原生扫描器 + 可选 Everything 后端，进度 / 取消 / 缓存。
+- 迁移：逐文件清单校验、自动回滚、进程锁检测（Restart Manager）、安全删除。
+- 配置升级为 v2，自动读取 v1 `config.json`；v1 源码归档到 `legacy/v1/`。
 
-## [0.1.0] - 2026-07-02
+### 安全
 
-### 首个开源版本
+- `safe_delete_tree` 永不递归进入 Junction / Symlink。
+- 校验不通过绝不删除源目录。
+- 迁移 / 归档 / 撤销 / 清理全部写审计。
 
-这是 CDriveCleaner 开源化后的首个版本，基于个人版 v4 重构而来。已在作者电脑上稳定使用并成功迁移 48+ 个 Junction（释放 59+ GB C 盘空间）。
+## [0.3.0] - 2026-07
 
-#### 功能
-- Web UI 扫描 C 盘大目录，按区域分组显示
-- robocopy 复制 + mklink /J 创建 NTFS Junction
-- UAC 自动提权：生成 .bat 脚本并调用 ShellExecute 触发管理员权限
-- 一键撤销：回迁数据到 C 盘并删除 Junction
-- 进程检查：迁移前检测目标程序是否运行
-- 临时 PowerShell 脚本获取磁盘容量信息
+- 桌面 GUI、设置页、日志落盘、可折叠分区、字体设置。
+- Web 服务模式独立打包。
 
-#### 已知限制（后续版本解决）
-- 无持久化日志，无迁移前快照
-- 暂无 PyInstaller 打包的 exe 分发版
+## [0.2.0] - 2026-07
+
+- 模块化拆分、PyInstaller 打包、Junction 迁移 + 撤销。
+
+## [0.1.0] - 2026-07
+
+- 项目开源化：去硬编码、config.json、模块拆分。

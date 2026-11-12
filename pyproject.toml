@@ -1,0 +1,34 @@
+# Project metadata for editable installs / tooling.
+# The app itself can run directly with `python -m cdc` without installation.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cdrivecleaner"
+version = "2.0.0"
+description = "C drive slimming with NTFS junctions and cold-data archive to HDD"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "Enkrid Rao"}]
+dependencies = ["PySide6>=6.5"]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.0"]
+
+[project.scripts]
+cdrivecleaner = "cdc.app:main"
+
+[tool.setuptools.packages.find]
+include = ["cdc*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["legacy", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
