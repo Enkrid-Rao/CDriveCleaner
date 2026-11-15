@@ -35,6 +35,7 @@ from cdc.core.models import (  # noqa: E402
 )
 
 theme.set_motion(False)
+theme.apply_app_theme(app)
 
 
 def now_ts(days_ago: float = 0) -> float:

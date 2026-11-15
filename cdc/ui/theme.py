@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QPalette
 
 # ============================================================
 # 颜色
@@ -125,6 +125,73 @@ TONE_BORDER = {
 
 def tone_color(tone: str) -> str:
     return TONE_COLORS.get(tone, TONE_COLORS["brand"])
+
+
+# ============================================================
+# 调色板：钉死浅色，屏蔽系统深色模式
+# ============================================================
+
+def build_palette() -> QPalette:
+    """构造与主题一致的浅色调色板。
+
+    QSS 只覆盖了主要控件的背景；QFileDialog、QTextBrowser 这类靠调色板
+    绘制的控件仍会跟随系统。Windows 开着深色模式时，它们会拿到深色底，
+    却仍用 QSS 里的墨色文字 → 目录选择框整片糊成黑底黑字。这里显式给出
+    暖纸张调色板，任何系统主题下都保持「浅底 + 墨字」。
+    """
+    pal = QPalette()
+    roles = {
+        QPalette.ColorRole.Window: SURFACE,
+        QPalette.ColorRole.WindowText: TEXT,
+        QPalette.ColorRole.Base: INPUT,
+        QPalette.ColorRole.AlternateBase: SURFACE_2,
+        QPalette.ColorRole.ToolTipBase: SIDEBAR,
+        QPalette.ColorRole.ToolTipText: "#F7F0E4",
+        QPalette.ColorRole.Text: TEXT,
+        QPalette.ColorRole.Button: SURFACE_2,
+        QPalette.ColorRole.ButtonText: TEXT_2,
+        QPalette.ColorRole.BrightText: "#FFFFFF",
+        QPalette.ColorRole.Light: "#FFFFFF",
+        QPalette.ColorRole.Midlight: "#E8DFCF",
+        QPalette.ColorRole.Mid: BORDER,
+        QPalette.ColorRole.Dark: BORDER_STRONG,
+        QPalette.ColorRole.Shadow: "#9A8E7A",
+        QPalette.ColorRole.Highlight: BRAND,
+        QPalette.ColorRole.HighlightedText: "#FFF8F0",
+        QPalette.ColorRole.Link: BRAND,
+        QPalette.ColorRole.LinkVisited: PINK,
+        QPalette.ColorRole.PlaceholderText: DIM,
+    }
+    for role, color in roles.items():
+        pal.setColor(role, qcolor(color))
+    # 失焦时的选中态：淡一点，避免整屏跳色
+    pal.setColor(QPalette.ColorGroup.Inactive, QPalette.ColorRole.Highlight,
+                 qcolor("#C87C60"))
+    for role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text,
+                 QPalette.ColorRole.ButtonText):
+        pal.setColor(QPalette.ColorGroup.Disabled, role, qcolor("#A79D8C"))
+    pal.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Base,
+                 qcolor(SURFACE_2))
+    pal.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Highlight,
+                 qcolor("#E6DCCB"))
+    pal.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.HighlightedText,
+                 qcolor(DIM))
+    return pal
+
+
+def apply_app_theme(app) -> None:
+    """在创建任何窗口前调用：强制浅色配色方案 + 浅色调色板。"""
+    try:
+        setter = getattr(app.styleHints(), "setColorScheme", None)
+        if setter is not None:
+            from PySide6.QtCore import Qt
+            setter(Qt.ColorScheme.Light)
+    except Exception:
+        pass
+    try:
+        app.setPalette(build_palette())
+    except Exception:
+        pass
 
 
 _chevron_cache: dict[str, str] = {}
@@ -641,6 +708,57 @@ QToolTip {{
     padding: 7px 10px;
     font-size: {px(12)}px;
 }}
+
+/* ================= 目录选择（非原生 QFileDialog） ================= */
+QFileDialog {{ background: {SURFACE}; }}
+QFileDialog QLabel {{ color: {TEXT_2}; font-size: {px(12)}px; }}
+QFileDialog QListView, QFileDialog QTreeView {{
+    background: {INPUT};
+    border: 1px solid {BORDER};
+    border-radius: 8px;
+    color: {TEXT};
+    selection-background-color: {BRAND};
+    selection-color: #FFF8F0;
+    outline: 0;
+    padding: 3px;
+}}
+QFileDialog QListView::item, QFileDialog QTreeView::item {{
+    min-height: {px(24)}px;
+    padding-left: 4px;
+    border-radius: 5px;
+}}
+QFileDialog QListView::item:hover, QFileDialog QTreeView::item:hover {{
+    background: {SURFACE_2};
+}}
+QFileDialog QListView::item:selected, QFileDialog QTreeView::item:selected {{
+    background: {BRAND};
+    color: #FFF8F0;
+}}
+QFileDialog QListView#sidebar {{
+    background: {SURFACE_2};
+    border: 1px solid {BORDER};
+    color: {TEXT_2};
+    padding: 3px;
+}}
+QFileDialog QListView#sidebar::item {{ padding: 3px 5px; }}
+QFileDialog QHeaderView {{ background: {SURFACE_2}; }}
+QFileDialog QHeaderView::section {{
+    background: {SURFACE_2};
+    color: {MUT};
+    border: none;
+    border-bottom: 1px solid {BORDER};
+    padding: 5px 8px;
+    font-size: {px(12)}px;
+    font-weight: 600;
+}}
+QFileDialog QToolButton {{
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 4px;
+}}
+QFileDialog QToolButton:hover {{ background: #F1EADF; border-color: {BORDER}; }}
+QFileDialog QSplitter::handle {{ background: transparent; }}
 
 /* ================= 对话框 ================= */
 QDialog#Dialog {{ background: #FBF8F2; border: 1px solid {BORDER_HI}; border-radius: 18px; }}

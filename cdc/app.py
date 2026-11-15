@@ -144,6 +144,9 @@ def _run_gui(start_page: str = "", smoke: bool = False) -> int:
 
     ui_family, mono_family = _pick_fonts()
     apply_font(app, ui_family, mono_family)
+    # 系统深色模式会让 Qt 给出深色调色板，而本主题的 QSS 只覆盖了主要控件
+    # 背景，QFileDialog / QTextBrowser 会变成黑底黑字。这里钉死浅色。
+    theme.apply_app_theme(app)
 
     # 单实例：已有实例则唤醒后退出
     from .ui.single_instance import SingleInstance
