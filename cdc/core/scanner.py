@@ -376,6 +376,17 @@ def classify_cold(name: str, stats: windows.DirStats, *,
     if any(x in lower for x in ("node_modules", ".git", ".venv", "venv")):
         return (TIER_SKIP, 15, "开发依赖目录：文件碎、可重建", [])
 
+    # 必须排在「视频/镜像/安装包」之前：Downloads 里本来就装满了安装包和 ISO，
+    # 若按内容构成判级，整个 Downloads 会拿一个 STRONG/推荐，被拿去整目录归档。
+    if lower in ("downloads", "download", "下载") and size >= SKIP_IF_SMALL["downloads"]:
+        # 整个 Downloads 不做「推荐归档」：它是浏览器/下载器的默认保存位置，
+        # 整目录搬到归档盘（尤其是链接归档）会让日常下载依赖那块盘。
+        # 真正该归档的是它下面的 Software / ISOs / Compressed 这类子目录。
+        return (TIER_OPTIONAL, 42,
+                "下载目录：整体归档会把系统默认保存位置搬空，建议只归档其中的子目录",
+                ["Downloads 是浏览器与下载器的默认路径，整目录归档后新下载会落在原处空壳里",
+                 "建议改选它下面的子目录（如 Software / ISOs / Compressed / MobileApps）"])
+
     if ratios.get("video", 0) >= 0.55 and size >= 1024 ** 3:
         return (TIER_STRONG, 94, "视频为主，顺序读取，机械盘非常适合", [])
     if ratios.get("iso", 0) >= 0.40 and size >= 700 * 1024 ** 2:
@@ -388,8 +399,6 @@ def classify_cold(name: str, stats: windows.DirStats, *,
         return (TIER_RECOMMEND, 82, "压缩包/归档文件，适合冷存储", [])
     if ratios.get("image", 0) >= 0.55 and size >= 2 * 1024 ** 3:
         return (TIER_RECOMMEND, 78, "图片素材为主，适合机械盘", [])
-    if lower in ("downloads", "download", "下载") and size >= SKIP_IF_SMALL["downloads"]:
-        return (TIER_RECOMMEND, 84, "下载缓冲目录：消耗品多，归档后可随时回看", ["移动后下载器需要重新指定保存位置"] if lower else [])
     if age_days >= 180 and size >= 2 * 1024 ** 3 and ratios.get("video", 0) + ratios.get("archive", 0) + ratios.get("image", 0) + ratios.get("document", 0) >= 0.45:
         return (TIER_RECOMMEND, 76, f"最近 {age_days} 天没有修改，属于冷数据", [])
     if any(x in lower for x in ("backup", "backups", "备份", "archive", "归档")) and size >= 1024 ** 3:

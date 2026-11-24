@@ -754,9 +754,13 @@ def archive_item(item: OperationItem, ctx: OperationContext,
                            bytes_moved=manifest.bytes, files=manifest.files,
                            record_id=rec, extra={"dest": dst})
 
-    ctx.emit("清空源目录", 82,
-             "副本已校验，正在清空源目录（保留目录结构）…"
-             if mode == MODE_MOVE else "副本已校验，正在删除源目录…",
+    keep_src = bool(getattr(ctx.config, "keep_source_dir", True))
+    if mode == MODE_MOVE:
+        stage_text = ("副本已校验，正在清空源目录（保留目录骨架）…" if keep_src
+                      else "副本已校验，正在删除源目录…")
+    else:
+        stage_text = "副本已校验，正在删除源目录…"
+    ctx.emit("清空源目录", 82, stage_text,
              item_index=item_index, item_count=item_count)
 
     def del_progress(files: int, size: int) -> None:
@@ -813,15 +817,22 @@ def archive_item(item: OperationItem, ctx: OperationContext,
                                record_id=rec, extra={"dest": dst})
     else:
         if mode == MODE_MOVE:
-            # 用户要的是“清空内容、保留目录骨架”，不是删掉 Downloads 本身
-            delete = windows.clear_tree_keep_structure(
-                src, cancel=None, on_progress=del_progress)
+            if keep_src:
+                # 默认：清空内容、保留目录骨架，源目录本身仍然存在
+                delete = windows.clear_tree_keep_structure(
+                    src, cancel=None, on_progress=del_progress)
+                stage, err_head = "clear", "源目录未完全清空"
+            else:
+                # 设置里关掉「归档后保留原目录」：连目录本身一起删掉
+                delete = windows.safe_delete_tree(
+                    src, cancel=None, on_progress=del_progress)
+                stage, err_head = "delete", "源目录删除不完整"
             if not delete.ok:
-                err = ("源目录未完全清空（数据已完整校验并保存在归档目标）："
+                err = (f"{err_head}（数据已完整校验并保存在归档目标）："
                        + _join_errors(delete.errors))
                 rec = _record(ctx, item, "failed", started, verified=True, error=err,
                               bytes_moved=manifest.bytes, files=manifest.files,
-                              extra={"stage": "clear", "dest": dst,
+                              extra={"stage": stage, "dest": dst,
                                      "manifest": manifest_path,
                                      "delete_errors": delete.errors[:20]})
                 return _result(item, ok=False, started=started, error=err,
@@ -863,16 +874,19 @@ def archive_item(item: OperationItem, ctx: OperationContext,
                                record_id=rec, rolled_back=restored,
                                extra={"dest": dst, "rollback": restored})
 
-    ctx.emit("完成", 100,
-             ("归档完成，源目录已清空（保留结构）"
-              if mode == MODE_MOVE and not is_link_source
-              else f"归档完成，释放 {human_bytes(manifest.bytes)}"),
+    if mode == MODE_MOVE and not is_link_source:
+        done_text = ("归档完成，源目录已清空（保留目录骨架）" if keep_src
+                     else "归档完成，源目录已删除")
+    else:
+        done_text = f"归档完成，释放 {human_bytes(manifest.bytes)}"
+    ctx.emit("完成", 100, done_text,
              bytes_done=manifest.bytes, bytes_total=manifest.bytes,
              item_index=item_index, item_count=item_count)
     rec = _record(ctx, item, "success", started, verified=True,
                   bytes_moved=manifest.bytes, files=manifest.files,
                   extra={"dest": dst, "manifest": manifest_path, "mode": mode,
                          "junction_source": is_link_source,
+                         "keep_source_dir": keep_src,
                          "old_target": work_src if is_link_source else ""})
     _prune_manifests(str(paths.manifests_dir()),
                      int(ctx.config.raw.get("safety", {}).get("keep_manifests", 30) or 30))
@@ -881,6 +895,7 @@ def archive_item(item: OperationItem, ctx: OperationContext,
                    files=manifest.files, record_id=rec,
                    extra={"dest": dst, "mode": mode,
                           "junction_source": is_link_source,
+                          "keep_source_dir": keep_src,
                           "old_target": work_src if is_link_source else ""})
 
 

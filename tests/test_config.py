@@ -64,6 +64,27 @@ class ConfigTests(unittest.TestCase):
         self.assertTrue(cfg.warnings)
         self.assertEqual(cfg.raw["version"], 2)
 
+    def test_keep_source_dir_default_and_roundtrip(self):
+        path = Path(tempfile.mkdtemp(prefix="cfg_keep_")) / "config.json"
+        cfg = config.load_config(path)
+        self.assertTrue(cfg.keep_source_dir)
+        cfg.keep_source_dir = False
+        cfg.save()
+        self.assertFalse(config.load_config(path).keep_source_dir)
+
+    def test_legacy_link_default_mode_falls_back_to_move(self):
+        path = Path(tempfile.mkdtemp(prefix="cfg_mode_")) / "config.json"
+        config.load_config(path)
+        data = json.loads(path.read_text(encoding="utf-8"))
+
+        data["storage"]["default_mode"] = "link"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        self.assertEqual(config.load_config(path).default_mode, "move")
+
+        data["storage"]["default_mode"] = "copy"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        self.assertEqual(config.load_config(path).default_mode, "copy")
+
 
 if __name__ == "__main__":
     unittest.main()

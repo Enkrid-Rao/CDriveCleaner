@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 
 from ... import paths
 from ...core import windows
-from ...core.models import MODE_COPY, MODE_LINK, MODE_MOVE
+from ...core.models import MODE_COPY, MODE_MOVE
 from ...version import __version__
 from .. import theme
 from ..widgets import (
@@ -81,11 +81,16 @@ class SettingsPage(ScrollPage):
         archive.add(FormRow("最小归档体积", "低于该体积的目录不进入冷数据候选。",
                             self.archive_min))
         self.default_mode = SegmentedControl(
-            [(MODE_MOVE, "移动归档"), (MODE_LINK, "链接归档"), (MODE_COPY, "仅复制")],
+            [(MODE_MOVE, "移动归档"), (MODE_COPY, "仅复制")],
             self.state.config.default_mode,
         )
-        archive.add(FormRow("默认归档方式", "移动最省空间；链接保留原路径；复制只备份。",
+        archive.add(FormRow("默认归档方式", "移动最省空间，源位置不留链接；复制只做备份。",
                             self.default_mode))
+        self.keep_source_dir = Toggle(self.state.config.keep_source_dir)
+        archive.add(FormRow(
+            "归档后保留原目录",
+            "开启时只清空内容、保留骨架；关闭则连目录一起删除。",
+            self.keep_source_dir))
         self.strict_verify = Check("严格校验（SHA256）")
         self.strict_verify.setChecked(self.state.config.strict_verify)
         archive.add(FormRow("校验强度", "开启后逐文件计算哈希，更稳但明显更慢。",
@@ -222,6 +227,7 @@ class SettingsPage(ScrollPage):
         self.temp_days.setValue(cfg.temp_retention_days)
         self.archive_min.setValue(cfg.archive_min_mb)
         self.default_mode.set_value(cfg.default_mode)
+        self.keep_source_dir.setChecked(cfg.keep_source_dir)
         self.strict_verify.setChecked(cfg.strict_verify)
         self.check_locks.setChecked(cfg.check_locks)
         self.confirm_high.setChecked(cfg.confirm_high_risk)
@@ -257,6 +263,7 @@ class SettingsPage(ScrollPage):
         cfg.temp_retention_days = self.temp_days.value()
         cfg.archive_min_mb = self.archive_min.value()
         cfg.default_mode = self.default_mode.value()
+        cfg.keep_source_dir = self.keep_source_dir.isChecked()
         cfg.strict_verify = self.strict_verify.isChecked()
         cfg.check_locks = self.check_locks.isChecked()
         cfg.confirm_high_risk = self.confirm_high.isChecked()

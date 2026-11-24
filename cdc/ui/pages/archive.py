@@ -40,6 +40,8 @@ TIER_TONES = {
     TIER_STRONG: "green", TIER_RECOMMEND: "teal",
     TIER_OPTIONAL: "amber", TIER_SKIP: "muted",
 }
+# 源目录本身已是 Junction 时，归档不新建链接，只是把原链接改指到归档目标
+LINK_RETARGET_LABEL = "链接改指"
 TIER_ICONS = {
     TIER_STRONG: "check", TIER_RECOMMEND: "archive",
     TIER_OPTIONAL: "info", TIER_SKIP: "x",
@@ -239,7 +241,7 @@ class ArchivePage(QWidget):
         mode_row.setSpacing(10)
         mode_row.addWidget(label("归档方式", "Label"))
         self.mode = SegmentedControl(
-            [(MODE_MOVE, "移动归档"), (MODE_LINK, "链接归档"), (MODE_COPY, "仅复制")],
+            [(MODE_MOVE, "移动归档"), (MODE_COPY, "仅复制")],
             self.state.config.default_mode,
         )
         self.mode.changed.connect(self._on_mode)
@@ -372,8 +374,8 @@ class ArchivePage(QWidget):
              "聊天数据库、浏览器缓存、IDE 索引、代码仓库与 node_modules。"
              "小文件高频随机读写是机械盘最弱的地方。"),
             ("amber", "alert", "外置盘注意",
-             "拔盘后目标路径会消失。移动归档的数据需要接上磁盘才能访问；"
-             "链接归档更不能指向会拔掉的盘。"),
+             "拔盘后归档数据就访问不到了。移动归档完成后源位置已经清空，"
+             "要取用那些文件必须先把归档盘接上。"),
         ]:
             box = QFrame()
             box.setObjectName("CardInset")
@@ -483,14 +485,17 @@ class ArchivePage(QWidget):
             self._render()
 
     def _on_mode(self, mode: str) -> None:
-        if mode == MODE_LINK:
-            text = "复制并校验后清空源内容，再在原位置建立 Junction；程序仍按原路径访问。"
-            tone = "warn"
-        elif mode == MODE_COPY:
+        if mode == MODE_COPY:
             text = "只复制并校验，源目录保留；适合先备份、暂不释放空间。"
             tone = "info"
         else:
-            text = "复制并校验后清空源目录内容，保留目录结构与空子目录；空间立即释放。"
+            # 归档 = 剪切：数据整份搬到归档盘，源位置不留链接、不占空间。
+            if getattr(self.state.config, "keep_source_dir", True):
+                text = ("复制并校验后清空源目录内容，只保留目录骨架；"
+                        "源目录仍然存在，不会留下任何链接。")
+            else:
+                text = ("复制并校验后把源目录整个删除（设置里关闭了「归档后保留原目录」）；"
+                        "等同剪切 + 粘贴。")
             tone = "success"
         self.mode_note.setText(text)
         self.mode_note.setStyleSheet(
@@ -505,7 +510,7 @@ class ArchivePage(QWidget):
         self.plan_value.setText(human_bytes(total))
         linked_count = sum(1 for c in selected if c.is_junction)
         if selected:
-            mode_text = (MODE_LABELS.get(MODE_LINK, "链接归档")
+            mode_text = (LINK_RETARGET_LABEL
                          if linked_count == len(selected)
                          else MODE_LABELS.get(self.mode.value(), ""))
             hint = f"{len(selected)} 个目录"
@@ -699,9 +704,13 @@ class ArchivePage(QWidget):
                 "\n".join(dupes[:8]), icon_name="alert", tone="rose")
             return
         mode = self.mode.value()
+        if getattr(self.state.config, "keep_source_dir", True):
+            move_note = "复制并校验后清空每个源目录的内容，但保留目录骨架。"
+        else:
+            move_note = "复制并校验后删除每个源目录（含目录本身）。"
         note = {
-            MODE_MOVE: "复制并校验后清空每个源目录的内容，但保留目录结构与空子目录。",
-            MODE_LINK: "复制并校验后清空内容，并在原位置建立 Junction。",
+            MODE_MOVE: move_note,
+            MODE_LINK: "源目录是 Junction：校验后清空旧目标，并把链接改指到归档目标。",
             MODE_COPY: "仅复制并校验，源目录保留。",
         }.get(mode, "")
         lines = "\n".join(f"· {i.name}  {fmt_size(i.size_bytes)} → {i.dest}"
@@ -910,8 +919,11 @@ class ArchivePage(QWidget):
         drive = next((d for d in self.state.drives
                       if d.letter.upper() == self.dest_drive), None)
         note = {
-            MODE_MOVE: "校验通过后清空源目录内容，但保留目录结构；源路径仍然存在。",
-            MODE_LINK: "校验后清空源内容并建立 Junction；若目标是外置盘，拔盘后原路径不可用。",
+            MODE_MOVE: ("校验通过后清空源目录内容，但保留目录骨架；源路径仍然存在。"
+                        if getattr(self.state.config, "keep_source_dir", True)
+                        else "校验通过后删除源目录（含目录本身）；源路径不再存在。"),
+            MODE_LINK: "源目录是 Junction：校验后清空旧目标，并把链接改指到归档目标；"
+                       "拔盘后原路径不可用。",
             MODE_COPY: "仅复制，源目录保留，不会释放空间。",
         }.get(mode, "")
         if drive and drive.is_usb:
@@ -920,7 +932,7 @@ class ArchivePage(QWidget):
         if linked:
             note += (f" 其中 {len(linked)} 个目录已通过 Junction 存放在其他盘："
                      "归档会保留原路径，并把链接改指到归档目标。")
-        mode_text = (MODE_LABELS.get(MODE_LINK, "链接归档")
+        mode_text = (LINK_RETARGET_LABEL
                      if linked and len(linked) == len(candidates)
                      else MODE_LABELS.get(mode, ""))
         ok = ConfirmDialog.ask(

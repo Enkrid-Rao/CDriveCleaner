@@ -90,6 +90,20 @@ class OperationTests(unittest.TestCase):
         self.assertTrue((src / "a.txt").exists())
         self.assertFalse(dst.exists())
 
+    def test_archive_move_can_delete_source_dir(self):
+        """关掉「归档后保留原目录」时，移动归档把源目录整个删掉。"""
+        src = self._source("delsrc")
+        dst = self.e / "archive_del"
+        item = OperationItem(action="archive", source=str(src), dest=str(dst),
+                             name="delsrc", mode=MODE_MOVE,
+                             size_bytes=windows.directory_size(str(src)))
+        with mock.patch.object(self.cfg, "keep_source_dir", False):
+            result = archive_item(item, self.ctx)
+        self.assertTrue(result.ok, result.error)
+        self.assertFalse(src.exists())
+        self.assertTrue((dst / "a.txt").exists())
+        self.assertTrue((dst / "sub" / "b.bin").exists())
+
     def test_archive_copy_keeps_source(self):
         src = self._source("copy_src")
         dst = self.e / "copy_dst"
@@ -100,20 +114,18 @@ class OperationTests(unittest.TestCase):
         self.assertTrue(src.exists())
         self.assertTrue((dst / "a.txt").exists())
 
-    def test_archive_link_and_undo(self):
+    def test_archive_link_mode_rejected_for_real_dir(self):
+        """普通目录不允许链接归档：源位置必须等同剪切，不能留 Junction。"""
         src = self._source("link_src")
         dst = self.e / "link_dst"
         result = archive_item(OperationItem(
             action="archive", source=str(src), dest=str(dst), name="link_src",
             mode=MODE_LINK, size_bytes=windows.directory_size(str(src))), self.ctx)
-        self.assertTrue(result.ok, result.error)
-        self.assertTrue(windows.is_junction(str(src)))
-        undo = OperationItem(action="undo", source=str(src), dest=str(dst),
-                             name="link_src", extra={"delete_target": True})
-        result2 = undo_item(undo, self.ctx)
-        self.assertTrue(result2.ok, result2.error)
-        self.assertTrue((src / "a.txt").exists())
+        self.assertFalse(result.ok)
+        self.assertIn("不会在原位置保留链接", result.error)
+        self.assertFalse(windows.is_junction(str(src)))
         self.assertFalse(dst.exists())
+        self.assertTrue((src / "a.txt").exists())
 
     def test_clean_temp_respects_retention(self):
         temp = self.d / "faketemp"

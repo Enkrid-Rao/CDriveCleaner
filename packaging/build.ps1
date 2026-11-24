@@ -5,8 +5,8 @@
 #
 # 产物：
 #   dist\CDriveCleaner\CDriveCleaner.exe              安装版 / 便携版共用的 onedir 载荷
-#   dist\CDriveCleaner-Portable-v2.2.0.zip            便携版（解压即用）
-#   dist\CDriveCleaner-Setup-v2.2.0.exe               安装版（Inno Setup）
+#   dist\CDriveCleaner-Portable-v2.3.0.zip            便携版（解压即用）
+#   dist\CDriveCleaner-Setup-v2.3.0.exe               安装版（Inno Setup）
 
 param(
     [switch]$SkipInstaller,
@@ -18,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-$version = '2.2.0'
+$version = '2.3.0'
 $dist = Join-Path $root 'dist'
 $payload = Join-Path $dist 'CDriveCleaner'
 $exe = Join-Path $payload 'CDriveCleaner.exe'
@@ -33,6 +33,18 @@ if (-not (Test-Path $iscc)) {
     Write-Warning "未找到 Inno Setup: $iscc（安装包将被跳过）"
     $SkipInstaller = $true
 }
+
+Step "版本一致性检查"
+$codeVersion = (python -c "from cdc.version import __version__; print(__version__)").Trim()
+if ($codeVersion -ne $version) {
+    throw "版本不一致：cdc/version.py = $codeVersion，build.ps1 = $version"
+}
+foreach ($meta in 'packaging\installer.iss', 'packaging\version_info.txt') {
+    if (-not (Select-String -Path $meta -Pattern ([regex]::Escape($version)) -Quiet)) {
+        throw "版本不一致：$meta 里没有 $version"
+    }
+}
+Write-Host "版本 $version 一致" -ForegroundColor Green
 
 if (-not $NoClean) {
     Step "清理旧产物"

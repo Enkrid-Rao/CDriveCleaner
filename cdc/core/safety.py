@@ -295,6 +295,14 @@ def preflight_archive(item: OperationItem, config: Any,
     protected, reason = is_protected_path(src, config)
     if protected:
         result.add_error(f"源目录受保护：{reason}")
+    if mode == MODE_LINK and not is_link_source:
+        # 冷数据归档的语义是「剪切」：数据搬到归档盘，原位置不留任何链接。
+        # 只有源目录本来就是 Junction（之前迁移过）时才允许改指链接目标——
+        # 那种情况下删掉链接会让原路径消失、依赖它启动的程序直接坏掉。
+        result.add_error(
+            "冷数据归档不会在原位置保留链接（等同剪切/粘贴）："
+            "请改用「移动归档」或「仅复制」；"
+            "只有已经是 Junction 的目录才允许改指归档目标")
     if not os.path.isabs(dst):
         result.add_error("目标路径不是绝对路径")
     if _same_or_child(dst, src) or _same_or_child(src, dst):
@@ -334,7 +342,9 @@ def preflight_archive(item: OperationItem, config: Any,
     _space_check(free, size, "归档目标盘", result)
     if is_link_source:
         if mode == MODE_LINK:
-            result.warnings.append("源目录是 Junction：归档后会保留原路径，并把链接改指到归档目标")
+            result.warnings.append(
+                "源目录是 Junction：归档会保留原路径，并把链接改指到归档目标；"
+                "拔盘后原路径不可用")
         elif mode == MODE_MOVE:
             result.warnings.append("源目录是 Junction：移动归档会删除链接与原目标，原路径将不再存在")
 
@@ -344,13 +354,10 @@ def preflight_archive(item: OperationItem, config: Any,
     if mode in (MODE_MOVE, MODE_LINK) and config.check_locks:
         rows = _lock_rows(item, src, config)
         _locks_to_errors(rows, result)
-    elif mode == MODE_COPY and config.check_locks:
+    if mode == MODE_COPY and config.check_locks:
         rows = _lock_rows(item, src, config)
         if rows:
             result.warnings.append("源目录有程序正在使用；仅复制模式通常不受影响")
-
-    if mode == MODE_LINK:
-        result.warnings.append("链接归档会在原位置留下 Junction；拔掉外置盘后该路径不可用")
     return result
 
 

@@ -44,6 +44,14 @@ class ClassifyTests(unittest.TestCase):
             "clip", stats, size_min_bytes=100 * 1024 ** 2)
         self.assertEqual(tier, TIER_SKIP)
 
+    def test_downloads_is_not_recommended(self):
+        stats = self._stats(installer=6 * 1024 ** 3, archive=2 * 1024 ** 3)
+        tier, score, _reason, warnings = scanner.classify_cold(
+            "Downloads", stats, size_min_bytes=100 * 1024 ** 2)
+        self.assertNotEqual(tier, TIER_RECOMMEND)
+        self.assertLessEqual(score, 50)
+        self.assertTrue(any("子目录" in w for w in warnings), warnings)
+
 
 class ScanTests(unittest.TestCase):
     @classmethod

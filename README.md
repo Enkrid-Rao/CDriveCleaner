@@ -27,8 +27,8 @@ CDriveCleaner v2 同时处理两件事：
 1. **C 盘瘦身**：把大目录复制到迁移容器，校验通过后删除原目录，在原位置建立 Junction。
    应用仍然访问 `C:\...`，实际读写落在 D 盘；随时可以撤销回迁。
 2. **冷数据归档**：按「IO 模式」而不是「文件大小」识别冷数据，把视频、镜像、安装包、
-   模型权重等移到机械盘。已经通过 Junction 放在 D 盘的数据，也可以二次归档到 E 盘，
-   工具会把链接自动改指到新位置。
+   模型权重等**剪切**到机械盘：复制 → 逐文件校验 → 删除源，源位置不留任何链接，
+   与手动剪切 + 粘贴等价。只有本身已经是 Junction 的目录才会改指链接，避免原路径消失。
 
 ## 界面
 
@@ -65,19 +65,19 @@ CDriveCleaner v2 同时处理两件事：
   最后修改时间、文件平均大小。
   - 推荐：影视、ISO、虚拟机镜像、安装包、模型权重、照片素材、长期未动的归档。
   - 不推荐：聊天数据库、代码仓库、`node_modules`、浏览器缓存、IDE 索引。
-- **三种模式**：
-  1. **移动归档**：复制 → 校验 → **清空源目录内容，但保留目录结构与空子目录**。
-  2. **链接归档**：复制 → 校验 → 清空源内容 → Junction 指回目标，程序仍可访问原路径。
-  3. **仅复制**：只复制并校验，保留源目录。
+- **两种模式**（都不会在原位置留下链接）：
+  1. **移动归档**（默认）：复制 → 校验 → **清空源目录内容、保留目录骨架**，空间立即释放。
+     可在设置里关掉「归档后保留原目录」，改为连源目录本身一起删除。
+  2. **仅复制**：只复制并校验，源目录原样保留，用于先备份。
 - **自定义目录（可多选）**：冷数据推荐之外，可选择任意多个目录直接归档；移动归档后目录本身和子目录结构仍然保留，并按目录名同级放到目标路径。
 - **自动更新**：启动时每天检查一次 GitHub Release；安装版下载 Setup 静默覆盖安装，便携版退出后覆盖程序目录并重启；下载后做 SHA256 校验。详见 [docs/UPDATE.md](docs/UPDATE.md)。
-- **已链接冷数据二次归档**：例如 `C:\Users\你\Downloads` 已经 Junction 到 D 盘，
-  工具会把 D 盘上的真实数据搬到 E 盘，并把 `Downloads` 的链接改指到 E；
-  C 盘路径完全不变。
+- **已链接冷数据二次归档**：如果目录本身已经是 Junction（之前用「C 盘瘦身」迁过），
+  工具会把真实数据搬到 E 盘，并**把链接改指**到新位置——这种情况删掉链接会让原路径消失、
+  依赖它的程序直接坏掉。普通目录归档不会留下任何链接。
 
 ![已链接冷数据](docs/screenshots/archive_linked.png)
 
-- **可回迁**：普通移动归档可在「操作记录」里回迁；链接归档会保留原路径。
+- **可回迁**：移动归档可在「操作记录」里回迁，校验通过后才删除归档盘上的副本。
 
 ### 安全与可追溯
 
@@ -98,7 +98,7 @@ CDriveCleaner v2 同时处理两件事：
 
 ### 安装版（推荐）
 
-下载 `CDriveCleaner-Setup-v2.2.0.exe`，双击安装。默认安装到当前用户目录，
+下载 `CDriveCleaner-Setup-v2.3.0.exe`，双击安装。默认安装到当前用户目录，
 无需管理员权限；也可以选择为所有用户安装。
 
 - 开始菜单 / 可选桌面快捷方式
@@ -107,19 +107,19 @@ CDriveCleaner v2 同时处理两件事：
 
 ### 便携版
 
-下载 `CDriveCleaner-Portable-v2.2.0.zip`，**解压整个文件夹**后双击
+下载 `CDriveCleaner-Portable-v2.3.0.zip`，**解压整个文件夹**后双击
 `CDriveCleaner.exe`。目录中的 `portable.flag` 会让程序把配置和日志写在
 `data\` 子目录，整个文件夹可以放在 U 盘或移动硬盘里。
 
 > 便携版不要只复制 exe，`_internal` 目录必须一起保留。
 
-发布校验信息与安装/卸载验证见 [docs/RELEASE-v2.2.0.md](docs/RELEASE-v2.2.0.md)。
+发布校验信息与安装/卸载验证见 [docs/RELEASE-v2.3.0.md](docs/RELEASE-v2.3.0.md)。
 
 ### 系统要求
 
 - Windows 10 / 11，64 位
 - 迁移需要 NTFS（Junction 依赖）
-- 归档目标建议为机械硬盘；USB 外置盘可用，但拔盘后目标路径不可用
+- 归档目标建议为机械硬盘；USB 外置盘可用，但归档后拔盘就访问不到那些数据（源位置已清空）
 
 ## 从源码运行
 
@@ -155,10 +155,22 @@ python -m cdc --diagnose
 
 ### 冷数据二次归档
 
+普通目录（不是链接）归档后，源位置不留任何链接，等同剪切：
+
 ```
-归档前： C:\Users\你\Downloads  → Junction → D:\_CDrive\Users\你\Downloads (30 GB)
-归档后： C:\Users\你\Downloads  → Junction → E:\Downloads (30 GB)
-         D 盘旧目标已删除，C 盘路径不变
+归档前： C:\Users\你\Downloads\Software        (5 GB，真实目录)
+归档后： C:\Users\你\Downloads\Software        空目录（默认保留骨架；可在设置里关掉）
+        E:\Software                            (5 GB，真实目录)
+```
+
+关掉「归档后保留原目录」后，源目录本身也会被删除，效果与剪切 + 粘贴完全一致。
+
+原本就是 Junction 的目录（之前用过「C 盘瘦身」）才会改指链接：
+
+```
+归档前： C:\Users\你\AppData\Roaming\JetBrains → Junction → D:\_CDrive\...\JetBrains (16 GB)
+归档后： C:\Users\你\AppData\Roaming\JetBrains → Junction → E:\JetBrains (16 GB)
+        D 盘旧目标已删除，C 盘路径不变
 ```
 
 选中多个目录时，它们会按**目录名**同级放到目标路径下：
@@ -216,8 +228,8 @@ python -m PyInstaller --noconfirm --clean packaging\CDriveCleaner.spec
 
 ```
 dist/CDriveCleaner/CDriveCleaner.exe
-dist/CDriveCleaner-Portable-v2.2.0.zip
-dist/CDriveCleaner-Setup-v2.2.0.exe
+dist/CDriveCleaner-Portable-v2.3.0.zip
+dist/CDriveCleaner-Setup-v2.3.0.exe
 ```
 
 ## 项目结构

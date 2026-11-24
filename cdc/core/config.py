@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from .. import paths
-from .models import MODE_MOVE
+from .models import MODE_COPY, MODE_MOVE
 
 SCHEMA_VERSION = 2
 APP_SECTION = "storage"
@@ -155,6 +155,12 @@ def _default_archive_root() -> str:
     return r"D:\ColdStore"
 
 
+def _archive_mode(value: Any) -> str:
+    """归档方式只剩「移动 / 复制」；老配置里的 link 归一到移动归档。"""
+    text = str(value or "").strip().lower()
+    return MODE_COPY if text == MODE_COPY else MODE_MOVE
+
+
 def _default_config() -> dict[str, Any]:
     return {
         "version": SCHEMA_VERSION,
@@ -165,6 +171,7 @@ def _default_config() -> dict[str, Any]:
             "archive_min_mb": 200,
             "temp_retention_days": 1,
             "default_mode": MODE_MOVE,
+            "keep_source_dir": True,
         },
         "safety": {
             "check_locks": True,
@@ -329,6 +336,7 @@ class Config:
     archive_min_mb: int = 200
     temp_retention_days: int = 1
     default_mode: str = MODE_MOVE
+    keep_source_dir: bool = True
     strict_verify: bool = False
     check_locks: bool = True
     confirm_high_risk: bool = True
@@ -410,6 +418,7 @@ class Config:
             "archive_min_mb": self.archive_min_mb,
             "temp_retention_days": self.temp_retention_days,
             "default_mode": self.default_mode,
+            "keep_source_dir": self.keep_source_dir,
         })
         raw.setdefault("safety", {})
         raw["safety"].update({
@@ -563,7 +572,9 @@ def load_config(path: str | Path | None = None, *, create: bool = True) -> Confi
         threshold_mb=int(storage.get("threshold_mb", 100) or 100),
         archive_min_mb=int(storage.get("archive_min_mb", 200) or 200),
         temp_retention_days=int(storage.get("temp_retention_days", 1) or 1),
-        default_mode=str(storage.get("default_mode") or MODE_MOVE),
+        # 归档不再提供「链接归档」，老配置里的 link 一律归到移动归档
+        default_mode=_archive_mode(storage.get("default_mode")),
+        keep_source_dir=bool(storage.get("keep_source_dir", True)),
         strict_verify=bool(safety.get("strict_verify", False)),
         check_locks=bool(safety.get("check_locks", True)),
         confirm_high_risk=bool(safety.get("confirm_high_risk", True)),
