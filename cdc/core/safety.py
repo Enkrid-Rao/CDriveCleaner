@@ -295,6 +295,14 @@ def preflight_archive(item: OperationItem, config: Any,
     protected, reason = is_protected_path(src, config)
     if protected:
         result.add_error(f"源目录受保护：{reason}")
+    if is_link_source and mode == MODE_MOVE:
+        # 移动归档要先把原链接删掉，才需要“能不能删”的探测；
+        # 链接归档现在走就地改指，不需要删除链接。
+        deletable, why = windows.can_delete(src)
+        if not deletable:
+            result.add_error(
+                f"源目录的 Junction 现在删不掉（{why}）："
+                "请关掉正在使用该目录的程序后重试")
     if mode == MODE_LINK and not is_link_source:
         # 冷数据归档的语义是「剪切」：数据搬到归档盘，原位置不留任何链接。
         # 只有源目录本来就是 Junction（之前迁移过）时才允许改指链接目标——

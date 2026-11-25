@@ -119,6 +119,25 @@ class ArchiveModeTests(unittest.TestCase):
                                           self.cfg, windows.list_drives())
         self.assertTrue(result.ok, result.errors)
 
+    def test_preflight_blocks_when_junction_is_locked(self):
+        """移动归档要删链接，被占用时预检就该拦住，而不是复制完几个 GB 才失败。"""
+        target = self.d / "locked_target"
+        target.mkdir(exist_ok=True)
+        (target / "app.bin").write_bytes(b"x" * 1024)
+        link = self.home / "LockedApp"
+        ok, err = windows.create_junction(str(link), str(target))
+        self.assertTrue(ok, err)
+
+        kernel32, handle = base.lock_dir(str(link))
+        try:
+            result = safety.preflight_archive(self._item(link, "move"),
+                                              self.cfg, windows.list_drives())
+        finally:
+            base.unlock_dir(kernel32, handle)
+        self.assertFalse(result.ok)
+        self.assertTrue(any("删不掉" in error for error in result.errors),
+                        result.errors)
+
 
 if __name__ == "__main__":
     unittest.main()

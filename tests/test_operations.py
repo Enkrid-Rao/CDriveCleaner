@@ -104,6 +104,31 @@ class OperationTests(unittest.TestCase):
         self.assertTrue((dst / "a.txt").exists())
         self.assertTrue((dst / "sub" / "b.bin").exists())
 
+    def test_archive_link_source_retargets_readonly_junction(self):
+        """回归：带只读属性的 Junction 源也能完成改指归档（Videos 那次的情况）。"""
+        target = self.d / "ro_videos_target"
+        (target / "sub").mkdir(parents=True)
+        (target / "a.mp4").write_bytes(os.urandom(200_000))
+        (target / "sub" / "b.mp4").write_bytes(os.urandom(50_000))
+        link = self.d / "RoVideosLink"
+        ok, err = windows.create_junction(str(link), str(target))
+        self.assertTrue(ok, err)
+        self.assertTrue(base.set_link_readonly(str(link)))
+
+        dst = self.e / "ro_archive"
+        item = OperationItem(action="archive", source=str(link), dest=str(dst),
+                             name="RoVideosLink", mode=MODE_LINK,
+                             size_bytes=windows.directory_size(str(target)),
+                             extra={"junction_source": True, "old_target": str(target)})
+        result = archive_item(item, self.ctx)
+        self.assertTrue(result.ok, result.error)
+        self.assertTrue(windows.is_junction(str(link)))
+        self.assertEqual(os.path.normcase(windows.junction_target(str(link))),
+                         os.path.normcase(str(dst)))
+        self.assertTrue((dst / "a.mp4").exists())
+        self.assertTrue((dst / "sub" / "b.mp4").exists())
+        self.assertFalse(target.exists())
+
     def test_archive_copy_keeps_source(self):
         src = self._source("copy_src")
         dst = self.e / "copy_dst"

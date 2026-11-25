@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import stat
 import subprocess
 import sys
 import time
@@ -78,6 +79,81 @@ class WindowsTests(unittest.TestCase):
         self.assertTrue((root / "a" / "linked").is_dir())
         self.assertEqual(list((root / "a" / "b").iterdir()), [])
         self.assertTrue((target / "safe.txt").exists())
+
+    def test_can_delete_regular_dir(self):
+        plain = self.d / "plain"
+        plain.mkdir()
+        deletable, why = windows.can_delete(str(plain))
+        self.assertTrue(deletable, why)
+
+    def test_remove_link_reports_blocking_handle(self):
+        target = self.d / "lock_target"
+        target.mkdir()
+        (target / "keep.txt").write_text("keep")
+        link = self.d / "lock_link"
+        ok, err = windows.create_junction(str(link), str(target))
+        self.assertTrue(ok, err)
+
+        kernel32, handle = base.lock_dir(str(link))
+        try:
+            deletable, why = windows.can_delete(str(link))
+            self.assertFalse(deletable)
+            self.assertIn("占用", why)
+
+            ok2, why2 = windows.remove_link_ex(str(link), attempts=1)
+            self.assertFalse(ok2)
+            self.assertTrue(why2)
+            self.assertTrue(windows.is_junction(str(link)))
+        finally:
+            base.unlock_dir(kernel32, handle)
+
+        ok3, why3 = windows.remove_link_ex(str(link))
+        self.assertTrue(ok3, why3)
+        self.assertFalse(os.path.lexists(str(link)))
+        self.assertTrue((target / "keep.txt").exists())
+
+    def test_remove_link_clears_readonly(self):
+        """带只读属性的 junction 必须先清属性才能删（WinError 5 的来源）。"""
+        target = self.d / "ro_target"
+        target.mkdir()
+        (target / "keep.txt").write_text("keep")
+        link = self.d / "ro_link"
+        ok, err = windows.create_junction(str(link), str(target))
+        self.assertTrue(ok, err)
+        self.assertTrue(base.set_link_readonly(str(link)))
+        self.assertTrue(os.lstat(str(link)).st_file_attributes & 0x1)
+
+        ok2, why2 = windows.remove_link_ex(str(link), attempts=1)
+        self.assertTrue(ok2, why2)
+        self.assertFalse(os.path.lexists(str(link)))
+        self.assertTrue((target / "keep.txt").exists())
+
+    def test_retarget_junction_in_place(self):
+        """改指应该就地改写重解析点，只读的链接也能改。"""
+        first = self.d / "rt_first"
+        second = self.d / "rt_second"
+        for path, name in ((first, "a.txt"), (second, "b.txt")):
+            path.mkdir()
+            (path / name).write_text(name)
+        link = self.d / "rt_link"
+        ok, err = windows.create_junction(str(link), str(first))
+        self.assertTrue(ok, err)
+        self.assertTrue(base.set_link_readonly(str(link)))
+
+        ok2, why2 = windows.retarget_junction(str(link), str(second))
+        self.assertTrue(ok2, why2)
+        self.assertEqual(os.path.normcase(windows.junction_target(str(link))),
+                         os.path.normcase(str(second)))
+        self.assertTrue((link / "b.txt").exists())
+        self.assertTrue((first / "a.txt").exists())
+
+    def test_delete_entry_clears_readonly_file(self):
+        target = self.d / "ro_file.txt"
+        target.write_text("x")
+        os.chmod(target, stat.S_IREAD)
+        ok, why = windows.delete_entry(str(target))
+        self.assertTrue(ok, why)
+        self.assertFalse(target.exists())
 
     def test_restart_manager_detects_lock(self):
         target = self.d / "locked"

@@ -584,8 +584,10 @@ def undo_item(item: OperationItem, ctx: OperationContext,
 
     ctx.emit("移除链接", 8, "删除 Junction（不会删除目标数据）…",
              item_index=item_index, item_count=item_count)
-    if not windows.remove_link(src):
-        err = "无法删除 Junction，可能有程序正在占用"
+    unlinked, unlink_error = windows.remove_link_ex(src)
+    if not unlinked:
+        err = ("无法删除 Junction，可能有程序正在占用："
+               + (unlink_error or "原因未知"))
         rec = _record(ctx, item, "failed", started, verified=False, error=err,
                       extra={"stage": "unlink", "target": target})
         return _result(item, ok=False, started=started, error=err, record_id=rec)
@@ -769,13 +771,62 @@ def archive_item(item: OperationItem, ctx: OperationContext,
                  bytes_total=manifest.bytes, item_index=item_index,
                  item_count=item_count)
 
-    if is_link_source:
-        # 先移除链接，再删旧目标：链接是 0 字节，删它不会碰数据
-        if not windows.remove_link(src):
-            err = "副本已校验，但无法移除原目录的 Junction"
+    if is_link_source and mode == MODE_LINK:
+        # 就地改指：不删链接、不重建，路径全程可用，也不受链接自带只读属性影响。
+        ctx.emit("改指链接", 84, "正在把原路径改指到归档目标…",
+                 item_index=item_index, item_count=item_count)
+        retargeted, retarget_error = windows.retarget_junction(src, dst)
+        if not retargeted:
+            # 兜底：删旧链接再建新链接（remove_link_ex 会先清链接自身的只读属性）
+            unlinked, unlink_error = windows.remove_link_ex(src)
+            if not unlinked:
+                err = ("副本已校验，但无法改指 / 移除原目录的 Junction："
+                       f"{retarget_error or unlink_error or '原因未知'}。"
+                       "关掉正占用该目录的程序后重试；"
+                       f"已校验的副本保留在 {dst}")
+                rec = _record(ctx, item, "failed", started, verified=True, error=err,
+                              bytes_moved=manifest.bytes, files=manifest.files,
+                              extra={"stage": "relink", "dest": dst, "old_target": work_src,
+                                     "retarget_error": retarget_error,
+                                     "unlink_error": unlink_error})
+                return _result(item, ok=False, started=started, error=err,
+                               warnings=warnings, verified=True,
+                               bytes_moved=manifest.bytes, files=manifest.files,
+                               record_id=rec, extra={"dest": dst})
+            ok_link, link_err = windows.create_junction(src, dst)
+            if not ok_link:
+                windows.create_junction(src, work_src)  # 尽力把原路径恢复可用
+                err = (f"副本已校验并保存在 {dst}，但原路径链接创建失败：{link_err}")
+                rec = _record(ctx, item, "failed", started, verified=True, error=err,
+                              bytes_moved=manifest.bytes, files=manifest.files,
+                              extra={"stage": "relink", "dest": dst,
+                                     "old_target": work_src, "relinked": False})
+                return _result(item, ok=False, started=started, error=err,
+                               warnings=warnings, verified=True,
+                               bytes_moved=manifest.bytes, files=manifest.files,
+                               record_id=rec, extra={"dest": dst})
+
+        # 原路径已经指向归档目标，旧目标没删干净只是“没腾出空间”，不影响使用
+        ctx.emit("删除旧目标", 90, f"正在释放旧目标 {human_bytes(manifest.bytes)}…",
+                 item_index=item_index, item_count=item_count)
+        delete = windows.safe_delete_tree(work_src, cancel=None,
+                                          on_progress=del_progress)
+        if not delete.ok:
+            warnings.append("旧目标未删干净（不影响新位置的数据）："
+                            + _join_errors(delete.errors)
+                            + "；可稍后手动删除 " + work_src)
+    elif is_link_source:
+        # MODE_MOVE：链接和旧目标都删掉，原路径不再存在
+        unlinked, unlink_error = windows.remove_link_ex(src)
+        if not unlinked:
+            err = ("副本已校验，但无法移除原目录的 Junction："
+                   f"{unlink_error or '原因未知'}。"
+                   "关掉正占用该目录的程序后重试；"
+                   f"已校验的副本保留在 {dst}")
             rec = _record(ctx, item, "failed", started, verified=True, error=err,
                           bytes_moved=manifest.bytes, files=manifest.files,
-                          extra={"stage": "unlink", "dest": dst, "old_target": work_src})
+                          extra={"stage": "unlink", "dest": dst, "old_target": work_src,
+                                 "unlink_error": unlink_error})
             return _result(item, ok=False, started=started, error=err,
                            warnings=warnings, verified=True,
                            bytes_moved=manifest.bytes, files=manifest.files,
@@ -798,23 +849,6 @@ def archive_item(item: OperationItem, ctx: OperationContext,
                            warnings=warnings, verified=True,
                            bytes_moved=manifest.bytes, files=manifest.files,
                            record_id=rec, extra={"dest": dst})
-        if mode == MODE_LINK:
-            ctx.emit("重建链接", 94, "正在把原路径链接到归档目标…",
-                     item_index=item_index, item_count=item_count)
-            ok_link, link_err = windows.create_junction(src, dst)
-            if not ok_link:
-                # 目标数据已在归档盘，旧目标已删除；尝试再建一次链接
-                retry_ok, _retry = windows.create_junction(src, dst)
-                err = (f"旧目标已释放、数据已校验保存在 {dst}，但链接创建失败：{link_err}"
-                       + ("" if retry_ok else "；原路径当前不可用，可在链接管理页重试"))
-                rec = _record(ctx, item, "failed", started, verified=True, error=err,
-                              bytes_moved=manifest.bytes, files=manifest.files,
-                              extra={"stage": "relink", "dest": dst,
-                                     "old_target": work_src, "relinked": retry_ok})
-                return _result(item, ok=False, started=started, error=err,
-                               warnings=warnings, verified=True,
-                               bytes_moved=manifest.bytes, files=manifest.files,
-                               record_id=rec, extra={"dest": dst})
     else:
         if mode == MODE_MOVE:
             if keep_src:
@@ -956,8 +990,9 @@ def restore_archive(item: OperationItem, ctx: OperationContext,
         rec = _record(ctx, item, "failed", started, error=err)
         return _result(item, ok=False, started=started, error=err, record_id=rec)
     if windows.is_link(src):
-        if not windows.remove_link(src):
-            err = "无法移除原路径的链接"
+        unlinked, unlink_error = windows.remove_link_ex(src)
+        if not unlinked:
+            err = "无法移除原路径的链接：" + (unlink_error or "原因未知")
             rec = _record(ctx, item, "failed", started, error=err)
             return _result(item, ok=False, started=started, error=err, record_id=rec)
 
@@ -1012,14 +1047,23 @@ def relink_item(item: OperationItem, ctx: OperationContext,
     src = os.path.abspath(item.source)
     dst = os.path.abspath(item.dest)
     if os.path.lexists(src):
-        if not windows.remove_link(src):
-            err = "无法移除旧链接"
+        # 已经是 Junction 就直接改指，比删掉重建稳
+        retargeted, _retarget_error = windows.retarget_junction(src, dst)
+        if not retargeted:
+            unlinked, unlink_error = windows.remove_link_ex(src)
+            if not unlinked:
+                err = "无法移除旧链接：" + (unlink_error or "原因未知")
+                rec = _record(ctx, item, "failed", started, error=err)
+                return _result(item, ok=False, started=started, error=err, record_id=rec)
+            ok, err = windows.create_junction(src, dst)
+            if not ok:
+                rec = _record(ctx, item, "failed", started, error=err)
+                return _result(item, ok=False, started=started, error=err, record_id=rec)
+    else:
+        ok, err = windows.create_junction(src, dst)
+        if not ok:
             rec = _record(ctx, item, "failed", started, error=err)
             return _result(item, ok=False, started=started, error=err, record_id=rec)
-    ok, err = windows.create_junction(src, dst)
-    if not ok:
-        rec = _record(ctx, item, "failed", started, error=err)
-        return _result(item, ok=False, started=started, error=err, record_id=rec)
     rec = _record(ctx, item, "success", started, verified=True,
                   extra={"dest": dst})
     return _result(item, ok=True, started=started, verified=True, record_id=rec)
@@ -1039,8 +1083,9 @@ def unlink_item(item: OperationItem, ctx: OperationContext,
         rec = _record(ctx, item, "failed", started, error=err)
         return _result(item, ok=False, started=started, error=err, record_id=rec)
     target = windows.junction_target(src)
-    if not windows.remove_link(src):
-        err = "无法移除链接，可能被占用"
+    unlinked, unlink_error = windows.remove_link_ex(src)
+    if not unlinked:
+        err = "无法移除链接，可能被占用：" + (unlink_error or "原因未知")
         rec = _record(ctx, item, "failed", started, error=err)
         return _result(item, ok=False, started=started, error=err, record_id=rec)
     rec = _record(ctx, item, "success", started, verified=True,
@@ -1086,8 +1131,11 @@ def clean_temp(ctx: OperationContext, retention_days: int | None = None) -> Oper
                             continue
                         try:
                             if entry.name and entry.path:
-                                windows._force_writable(entry.path)
-                                os.unlink(entry.path)
+                                ok_del, why_del = windows.delete_entry(entry.path)
+                                if not ok_del:
+                                    errors.append(f"{entry.path}: {why_del}")
+                                    skipped += 1
+                                    continue
                             files_deleted += 1
                             bytes_deleted += int(st.st_size)
                         except OSError:

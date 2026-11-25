@@ -12,6 +12,7 @@ import json
 import os
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -603,6 +604,10 @@ class DeleteReport:
 
 
 def _force_writable(path: str) -> None:
+    """清掉只读属性。链接必须走句柄方式，否则 os.chmod / attrib 会改到目标上。"""
+    if is_junction(path) or os.path.islink(path):
+        _clear_link_readonly(path)
+        return
     try:
         os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
     except OSError:
@@ -612,24 +617,252 @@ def _force_writable(path: str) -> None:
             pass
 
 
-def remove_link(path: str) -> bool:
-    """只删除链接本身，绝不触碰目标数据。"""
+_DELETE_ACCESS = 0x00010000
+_FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
+_FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
+_FILE_READ_ATTRIBUTES = 0x0080
+_FILE_WRITE_ATTRIBUTES = 0x0100
+_GENERIC_READ = 0x80000000
+_GENERIC_WRITE = 0x40000000
+_FSCTL_SET_REPARSE_POINT = 0x000900A4
+_IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003
+_WIN_ERROR_TEXT = {
+    2: "路径不存在",
+    3: "路径不存在",
+    5: "拒绝访问，可能没有删除权限",
+    32: "目录正被其他程序占用（共享冲突）",
+}
+
+
+class _FILE_BASIC_INFO(ctypes.Structure):
+    _fields_ = [
+        ("CreationTime", ctypes.c_longlong),
+        ("LastAccessTime", ctypes.c_longlong),
+        ("LastWriteTime", ctypes.c_longlong),
+        ("ChangeTime", ctypes.c_longlong),
+        ("FileAttributes", wt.DWORD),
+    ]
+
+
+def _win_error_text(err: int) -> str:
+    label = _WIN_ERROR_TEXT.get(int(err or 0))
+    return f"{label}（WinError {err}）" if label else f"WinError {err}"
+
+
+def _os_error_text(exc: OSError) -> str:
+    winerror = getattr(exc, "winerror", None)
+    if winerror:
+        return _win_error_text(winerror)
+    return str(exc) or exc.__class__.__name__
+
+
+def can_delete(path: str) -> tuple[bool, str]:
+    """以 DELETE 权限试开目录，判断现在能否删除它（不会真的删除）。
+
+    目录被别的进程用「不允许删除」的共享方式打开时，这里会拿到共享冲突。
+    删除 Junction 前先探测，可以避免先复制几个 GB、最后一步才失败。
+    """
+    if not IS_WINDOWS or not os.path.lexists(path):
+        return True, ""
+    invalid = ctypes.c_void_p(-1).value
     try:
-        if is_junction(path):
-            os.rmdir(path)
-        elif os.path.islink(path):
-            os.unlink(path)
-        elif os.path.isdir(path):
-            os.rmdir(path)
-        elif os.path.exists(path):
-            os.unlink(path)
-        return not os.path.lexists(path)
-    except OSError:
-        # 回退到 cmd rd（不带 /s，不会递归目标）
-        if os.path.isdir(path) and is_junction(path):
-            res = run_cmd(f'cmd /c rd "{path}"', timeout=30)
-            return res.code == 0 and not os.path.lexists(path)
-        return not os.path.lexists(path)
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        create = kernel32.CreateFileW
+        create.restype = ctypes.c_void_p
+        create.argtypes = [wt.LPCWSTR, wt.DWORD, wt.DWORD, ctypes.c_void_p,
+                           wt.DWORD, wt.DWORD, ctypes.c_void_p]
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        handle = create(os.path.abspath(path), _DELETE_ACCESS, 0x7, None,
+                        3, _FILE_FLAG_BACKUP_SEMANTICS | _FILE_FLAG_OPEN_REPARSE_POINT,
+                        None)
+        if handle is None or handle == invalid:
+            return False, _win_error_text(ctypes.get_last_error())
+        kernel32.CloseHandle(ctypes.c_void_p(handle))
+        return True, ""
+    except Exception:
+        # 探测本身失败不该阻断主流程
+        return True, ""
+
+
+def _clear_link_readonly(path: str) -> bool:
+    """清掉链接对象自身的 FILE_ATTRIBUTE_READONLY（不会改到目标）。
+
+    Windows 的 RemoveDirectory 对带只读属性的 junction 会直接返回拒绝访问（5）；
+    而 attrib -R / os.chmod / SetFileAttributesW 都会跟随重解析点、改到目标上，
+    所以必须用 OPEN_REPARSE_POINT 打开链接，再 SetFileInformationByHandle。
+    """
+    if not IS_WINDOWS:
+        return False
+    try:
+        attrs = os.lstat(path).st_file_attributes
+    except (OSError, AttributeError):
+        return False
+    if not attrs & stat.FILE_ATTRIBUTE_READONLY:
+        return False
+    try:
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        create = kernel32.CreateFileW
+        create.restype = ctypes.c_void_p
+        create.argtypes = [wt.LPCWSTR, wt.DWORD, wt.DWORD, ctypes.c_void_p,
+                           wt.DWORD, wt.DWORD, ctypes.c_void_p]
+        kernel32.SetFileInformationByHandle.argtypes = [
+            ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, wt.DWORD]
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        handle = create(os.path.abspath(path),
+                        _FILE_READ_ATTRIBUTES | _FILE_WRITE_ATTRIBUTES,
+                        0x7, None, 3,
+                        _FILE_FLAG_BACKUP_SEMANTICS | _FILE_FLAG_OPEN_REPARSE_POINT,
+                        None)
+        if not handle or handle == ctypes.c_void_p(-1).value:
+            return False
+        try:
+            info = _FILE_BASIC_INFO(0, 0, 0, 0, stat.FILE_ATTRIBUTE_NORMAL)
+            return bool(kernel32.SetFileInformationByHandle(
+                handle, 0, ctypes.byref(info), ctypes.sizeof(info)))
+        finally:
+            kernel32.CloseHandle(ctypes.c_void_p(handle))
+    except Exception:
+        return False
+
+
+def remove_link_ex(path: str, *, attempts: int = 3,
+                   delay: float = 0.25) -> tuple[bool, str]:
+    """只删除链接本身，绝不触碰目标数据。返回 (是否成功, 失败原因)。
+
+    失败常见原因：
+    - 链接自身带只读属性（RemoveDirectory 会拒绝访问），先清属性；
+    - 目录被资源管理器 / 索引 / 杀毒 / 录屏等以「不允许删除」的共享方式打开，
+      这类占用往往是瞬时的，所以重试几次。
+    """
+    if not os.path.lexists(path):
+        return True, ""
+    _clear_link_readonly(path)
+    last = ""
+    for attempt in range(max(1, attempts)):
+        try:
+            if is_junction(path):
+                os.rmdir(path)
+            elif os.path.islink(path):
+                os.unlink(path)
+            elif os.path.isdir(path):
+                os.rmdir(path)
+            elif os.path.exists(path):
+                os.unlink(path)
+            if not os.path.lexists(path):
+                return True, ""
+            last = "删除后路径仍然存在"
+        except OSError as exc:
+            last = _os_error_text(exc)
+            time.sleep(delay * (attempt + 1))
+    # 回退到 cmd rd（不带 /s，不会递归目标）
+    if os.path.isdir(path) and is_junction(path):
+        res = run_cmd(f'cmd /c rd "{path}"', timeout=30)
+        if res.code == 0 and not os.path.lexists(path):
+            return True, ""
+        detail = (res.stdout or res.stderr or "").strip()
+        if detail:
+            last = detail
+        elif res.code:
+            last = f"cmd rd 退出码 {res.code}"
+    return False, last or "删除失败，原因未知"
+
+
+def remove_link(path: str) -> bool:
+    ok, _reason = remove_link_ex(path)
+    return ok
+
+
+def delete_entry(path: str, *, attempts: int = 2, delay: float = 0.15) -> tuple[bool, str]:
+    """删除单个文件 / 目录 / 链接，自动处理只读与瞬时占用。返回 (成功, 原因)。
+
+    这是所有删除路径的唯一入口：属性、链接、重试、真实错误码都在这里统一处理，
+    调用方不需要再关心“只读 / 链接 / 被占用”的差异。
+    """
+    if not os.path.lexists(path):
+        return True, ""
+    if is_junction(path) or os.path.islink(path):
+        return remove_link_ex(path, attempts=attempts, delay=delay)
+    last = ""
+    for attempt in range(max(1, attempts)):
+        try:
+            _force_writable(path)
+            if os.path.isdir(path):
+                os.rmdir(path)
+            else:
+                os.unlink(path)
+            if not os.path.lexists(path):
+                return True, ""
+            last = "删除后路径仍然存在"
+        except OSError as exc:
+            last = _os_error_text(exc)
+            time.sleep(delay * (attempt + 1))
+    return False, last or "删除失败，原因未知"
+
+
+def _mount_point_buffer(target: str) -> bytes:
+    target = os.path.abspath(target)
+    substitute = "\\??\\" + target
+    sub = substitute.encode("utf-16-le")
+    prn = target.encode("utf-16-le")
+    path_buffer = sub + b"\x00\x00" + prn + b"\x00\x00"
+    data_length = 8 + len(path_buffer)
+    header = struct.pack("<IHHHHHH", _IO_REPARSE_TAG_MOUNT_POINT, data_length, 0,
+                         0, len(sub), len(sub) + 2, len(prn))
+    return header + path_buffer
+
+
+def retarget_junction(link: str, new_target: str) -> tuple[bool, str]:
+    """就地改写 Junction 的重解析点，指向 new_target（不删除、不重建）。
+
+    比「删掉链接再 mklink」可靠：不受链接自带只读属性影响，不存在路径短暂消失的
+    空窗，失败时原链接仍然可用。只支持目录 Junction。
+    """
+    link = os.path.abspath(link)
+    new_target = os.path.abspath(new_target)
+    if not is_junction(link):
+        return False, "不是 Junction，无法改指"
+    if not os.path.isdir(new_target):
+        return False, "新目标不存在"
+    last = ""
+    for attempt in range(3):
+        _clear_link_readonly(link)
+        try:
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            create = kernel32.CreateFileW
+            create.restype = ctypes.c_void_p
+            create.argtypes = [wt.LPCWSTR, wt.DWORD, wt.DWORD, ctypes.c_void_p,
+                               wt.DWORD, wt.DWORD, ctypes.c_void_p]
+            kernel32.DeviceIoControl.argtypes = [
+                ctypes.c_void_p, wt.DWORD, ctypes.c_void_p, wt.DWORD,
+                ctypes.c_void_p, wt.DWORD, ctypes.POINTER(wt.DWORD), ctypes.c_void_p]
+            kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+            handle = create(link, _GENERIC_READ | _GENERIC_WRITE, 0x7, None, 3,
+                            _FILE_FLAG_BACKUP_SEMANTICS | _FILE_FLAG_OPEN_REPARSE_POINT,
+                            None)
+            if not handle or handle == ctypes.c_void_p(-1).value:
+                last = _win_error_text(ctypes.get_last_error())
+                time.sleep(0.2 * (attempt + 1))
+                continue
+            try:
+                payload = _mount_point_buffer(new_target)
+                inbuf = ctypes.create_string_buffer(payload, len(payload))
+                returned = wt.DWORD(0)
+                ok = kernel32.DeviceIoControl(
+                    ctypes.c_void_p(handle), _FSCTL_SET_REPARSE_POINT,
+                    inbuf, len(payload), None, 0, ctypes.byref(returned), None)
+                if not ok:
+                    last = _win_error_text(ctypes.get_last_error())
+                    continue
+            finally:
+                kernel32.CloseHandle(ctypes.c_void_p(handle))
+            actual = os.path.normcase(junction_target(link).rstrip("\\/"))
+            if actual == os.path.normcase(new_target.rstrip("\\/")):
+                return True, ""
+            last = f"改指后目标不一致：{junction_target(link)}"
+        except Exception as exc:  # noqa: BLE001 - 失败要还原成可读原因
+            last = str(exc)
+            time.sleep(0.2 * (attempt + 1))
+    return False, last or "改指失败"
 
 
 def safe_delete_tree(
@@ -662,18 +895,17 @@ def safe_delete_tree(
             break
         path, visited = stack.pop()
         if visited:
-            try:
-                _force_writable(path)
-                os.rmdir(path)
-            except OSError as exc:
+            ok_dir, why_dir = delete_entry(path)
+            if not ok_dir:
                 report.ok = False
-                report.add(f"{path}: {exc}")
+                report.add(f"{path}: {why_dir}")
             continue
 
         if os.path.islink(path) or is_junction(path):
-            if not remove_link(path):
+            ok_link, why_link = remove_link_ex(path)
+            if not ok_link:
                 report.ok = False
-                report.add(f"无法删除链接: {path}")
+                report.add(f"无法删除链接 {path}: {why_link}")
             continue
 
         stack.append((path, True))
@@ -682,16 +914,20 @@ def safe_delete_tree(
                 for entry in it:
                     try:
                         if entry.is_junction() or entry.is_symlink():
-                            if not remove_link(entry.path):
+                            ok_link, why_link = remove_link_ex(entry.path)
+                            if not ok_link:
                                 report.ok = False
-                                report.add(f"无法删除链接: {entry.path}")
+                                report.add(f"无法删除链接 {entry.path}: {why_link}")
                             continue
                         if entry.is_dir(follow_symlinks=False):
                             stack.append((entry.path, False))
                         else:
                             st = entry.stat(follow_symlinks=False)
-                            _force_writable(entry.path)
-                            os.unlink(entry.path)
+                            ok_file, why_file = delete_entry(entry.path)
+                            if not ok_file:
+                                report.ok = False
+                                report.add(f"{entry.path}: {why_file}")
+                                continue
                             report.files += 1
                             report.bytes += int(st.st_size)
                             counter += 1
@@ -742,9 +978,10 @@ def clear_tree_keep_structure(
                     try:
                         if entry.is_junction() or entry.is_symlink():
                             was_dir = entry.is_dir(follow_symlinks=False)
-                            if not remove_link(entry.path):
+                            ok_link, why_link = remove_link_ex(entry.path)
+                            if not ok_link:
                                 report.ok = False
-                                report.add(f"无法移除链接: {entry.path}")
+                                report.add(f"无法移除链接 {entry.path}: {why_link}")
                             elif was_dir:
                                 os.makedirs(entry.path, exist_ok=True)
                             continue
@@ -752,8 +989,11 @@ def clear_tree_keep_structure(
                             stack.append(entry.path)
                             continue
                         st = entry.stat(follow_symlinks=False)
-                        _force_writable(entry.path)
-                        os.unlink(entry.path)
+                        ok_file, why_file = delete_entry(entry.path)
+                        if not ok_file:
+                            report.ok = False
+                            report.add(f"{entry.path}: {why_file}")
+                            continue
                         report.files += 1
                         report.bytes += int(st.st_size)
                         counter += 1
