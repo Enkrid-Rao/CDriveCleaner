@@ -412,10 +412,9 @@ class MainWindow(ResizableFrameless, QMainWindow):
             show_update_dialog(self, info)
 
     def _dismiss_update(self) -> None:
+        # 「稍后 / ✕」只是本次先不更新，不要把它记成「跳过此版本」——
+        # 否则用户点过一次就再也不会收到提醒（之前的坑）。
         self.update_banner.hide()
-        info = self.state.update_info
-        if info is not None:
-            self.state.skip_update(info.version)
 
     # ---------- 关闭 ----------
 

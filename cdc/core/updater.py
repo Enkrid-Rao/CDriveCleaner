@@ -88,15 +88,87 @@ def _digest_value(raw: str) -> str:
     return raw.lower()
 
 
+# ---------------- 网络线路 ----------------
+# GitHub 的资产域名（release-assets / objects.githubusercontent.com）在不少网络下
+# 直连会被 reset，而 api.github.com 直连通常没问题。所以下载要能自动找到本机代理。
+
+PROXY_CANDIDATES = (
+    "http://127.0.0.1:7899",
+    "http://127.0.0.1:7898",
+    "http://127.0.0.1:7890",
+    "http://127.0.0.1:10809",
+    "http://127.0.0.1:1080",
+)
+DOWNLOAD_ROUNDS = 2
+
+
+class DownloadCanceled(RuntimeError):
+    """用户取消下载。"""
+
+
+def _proxy_opener(proxy: str) -> Any:
+    return urllib.request.build_opener(
+        urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
+
+
+def _direct_opener() -> Any:
+    # 显式清空代理，避免环境变量 / 系统代理把「直连」也劫走
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def _env_proxy() -> str:
+    for key in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
+        value = (os.environ.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _routes(*, download: bool) -> list[tuple[str, Any]]:
+    """按优先级返回 (线路名, opener)。
+
+    下载：上次成功的代理 → 环境变量代理 → 常见本机代理端口 → 直连。
+    检查更新：直连 → 环境变量代理 → 上次成功的代理 → 常见端口。
+    """
+    remembered = str(load_state().get("download_proxy") or "").strip()
+    env = _env_proxy()
+    routes: list[tuple[str, Any]] = []
+
+    def add(proxy: str) -> None:
+        if proxy and all(name != proxy for name, _opener in routes):
+            routes.append((proxy, _proxy_opener(proxy)))
+
+    if download:
+        add(remembered)
+        add(env)
+        for proxy in PROXY_CANDIDATES:
+            add(proxy)
+        routes.append(("direct", _direct_opener()))
+    else:
+        routes.append(("direct", _direct_opener()))
+        add(env)
+        add(remembered)
+        for proxy in PROXY_CANDIDATES:
+            add(proxy)
+    return routes
+
+
 def fetch_latest_release(api_url: str | None = None, timeout: int = 15) -> dict[str, Any]:
     url = api_url or os.environ.get("CDC_UPDATE_API", "").strip() or API_URL
-    request = urllib.request.Request(url, headers={
+    headers = {
         "Accept": "application/vnd.github+json",
         "User-Agent": USER_AGENT,
         "X-GitHub-Api-Version": "2022-11-28",
-    })
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return json.loads(response.read().decode("utf-8"))
+    }
+    errors: list[str] = []
+    for name, opener in _routes(download=False):
+        try:
+            request = urllib.request.Request(url, headers=headers)
+            with opener.open(request, timeout=timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except Exception as exc:  # noqa: BLE001 - 换下一条线路
+            errors.append(f"{name}: {exc}")
+    raise RuntimeError("检查更新失败（直连与代理都不通）：" + "；".join(errors[:4]))
 
 
 def parse_release(raw: dict[str, Any], current: str = __version__,
@@ -176,45 +248,73 @@ def mark_skipped(version: str) -> None:
 
 # ---------------- download ----------------
 
-def download_asset(asset: UpdateAsset, dest_dir: str | Path,
-                   progress: Callable[[int, int], None] | None = None,
-                   cancel: Callable[[], bool] | None = None) -> str:
-    dest_dir = Path(dest_dir)
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    final = dest_dir / asset.name
-    part = final.with_name(final.name + ".part")
-    if not asset.digest:
-        raise RuntimeError("更新包缺少 SHA256 校验值，已拒绝自动下载")
+def _stream_download(opener: Any, asset: UpdateAsset, part: Path, final: Path,
+                     progress: Callable[[int, int], None] | None,
+                     cancel: Callable[[], bool] | None) -> None:
+    part.unlink(missing_ok=True)
     request = urllib.request.Request(asset.url, headers={"User-Agent": USER_AGENT})
     total = asset.size
     done = 0
     digest = hashlib.sha256()
-    with urllib.request.urlopen(request, timeout=60) as response, open(part, "wb") as f:
+    with opener.open(request, timeout=30) as response:
         try:
             total = int(response.headers.get("Content-Length") or total or 0)
         except (TypeError, ValueError):
             pass
-        while True:
-            if cancel and cancel():
-                f.close()
-                part.unlink(missing_ok=True)
-                raise RuntimeError("下载已取消")
-            chunk = response.read(256 * 1024)
-            if not chunk:
-                break
-            f.write(chunk)
-            digest.update(chunk)
-            done += len(chunk)
-            if progress:
-                progress(done, total)
+        with open(part, "wb") as f:
+            while True:
+                if cancel and cancel():
+                    raise DownloadCanceled("下载已取消")
+                chunk = response.read(256 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
+                digest.update(chunk)
+                done += len(chunk)
+                if progress:
+                    progress(done, total)
     if total and done != total:
-        part.unlink(missing_ok=True)
         raise RuntimeError(f"下载不完整：{done}/{total} 字节")
     if asset.digest and digest.hexdigest().lower() != asset.digest:
-        part.unlink(missing_ok=True)
-        raise RuntimeError("SHA256 校验失败，已删除下载文件")
+        raise RuntimeError("SHA256 校验失败")
     os.replace(part, final)
-    return str(final)
+
+
+def download_asset(asset: UpdateAsset, dest_dir: str | Path,
+                   progress: Callable[[int, int], None] | None = None,
+                   cancel: Callable[[], bool] | None = None) -> str:
+    """下载更新包：自动在「直连 / 上次成功的代理 / 常见本机代理」之间切换重试。
+
+    GitHub 的资产域名在部分网络下直连必被 reset；这里会把成功的线路记下来，
+    下次直接用，不再每次都先卡在直连上。
+    """
+    if not asset.digest:
+        raise RuntimeError("更新包缺少 SHA256 校验值，已拒绝自动下载")
+    dest_dir = Path(dest_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    final = dest_dir / asset.name
+    errors: list[str] = []
+
+    for round_index in range(DOWNLOAD_ROUNDS):
+        for name, opener in _routes(download=True):
+            part = final.with_name(f"{final.name}.part{round_index}")
+            try:
+                _stream_download(opener, asset, part, final, progress, cancel)
+            except DownloadCanceled:
+                part.unlink(missing_ok=True)
+                raise
+            except Exception as exc:  # noqa: BLE001 - 换下一条线路
+                part.unlink(missing_ok=True)
+                errors.append(f"{name}: {exc}")
+                continue
+            if name != "direct":
+                state = load_state()
+                if state.get("download_proxy") != name:
+                    state["download_proxy"] = name
+                    save_state(state)
+            return str(final)
+
+    raise RuntimeError("下载失败（已尝试直连与本机代理）：" + "；".join(errors[:6]))
 
 
 # ---------------- install ----------------

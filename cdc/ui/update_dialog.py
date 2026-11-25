@@ -193,7 +193,7 @@ class UpdateDialog(QDialog):
         self.later.clicked.connect(self.reject)
         footer.addWidget(self.later)
         self.action = QPushButton(
-            "打开发布页" if not info.installable else "下载更新")
+            "打开发布页" if not info.installable else "下载并安装")
         self.action.setObjectName("Primary")
         self.action.setMinimumWidth(132)
         self.action.setCursor(Qt.PointingHandCursor)
@@ -241,7 +241,9 @@ class UpdateDialog(QDialog):
         self.downloaded = path
         self.progress.setRange(0, 100)
         self.progress.setValue(100)
-        self.status.setText("下载完成，SHA256 校验通过。")
+        route = str(updater.load_state().get("download_proxy") or "")
+        where = f"（经 {route}）" if route else "（直连）"
+        self.status.setText(f"下载完成{where}，SHA256 校验通过。")
         self.action.setEnabled(True)
         self.action.setText("安装并重启")
         self.later.setEnabled(True)

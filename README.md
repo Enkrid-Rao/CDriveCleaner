@@ -73,7 +73,7 @@ CDriveCleaner v2 同时处理两件事：
 - **归档目录结构**（设置页与归档页都能改）：
   - **保留原路径**（默认）：`E:\C\Users\你\Downloads\Software`，完整保留归档前的盘符与路径；
   - **按目录名**：`E:\Software`，只按目录名同级摆放。
-- **自动更新**：启动时每天检查一次 GitHub Release；安装版下载 Setup 静默覆盖安装，便携版退出后覆盖程序目录并重启；下载后做 SHA256 校验。详见 [docs/UPDATE.md](docs/UPDATE.md)。
+- **自动更新**：启动时每天检查一次 GitHub Release；安装版下载 Setup 静默覆盖安装，便携版退出后覆盖程序目录并重启；下载后做 SHA256 校验。更新包下载会自动在直连与本机代理（7899 / 7898 / 7890 / 10809 / 1080）之间切换，并记住能用的那条。详见 [docs/UPDATE.md](docs/UPDATE.md)。
 - **已链接冷数据二次归档**：如果目录本身已经是 Junction（之前用「C 盘瘦身」迁过），
   工具会把真实数据搬到 E 盘，并**把链接改指**到新位置——这种情况删掉链接会让原路径消失、
   依赖它的程序直接坏掉。普通目录归档不会留下任何链接。
@@ -101,7 +101,7 @@ CDriveCleaner v2 同时处理两件事：
 
 ### 安装版（推荐）
 
-下载 `CDriveCleaner-Setup-v2.3.2.exe`，双击安装。默认安装到当前用户目录，
+下载 `CDriveCleaner-Setup-v2.3.3.exe`，双击安装。默认安装到当前用户目录，
 无需管理员权限；也可以选择为所有用户安装。
 
 - 开始菜单 / 可选桌面快捷方式
@@ -110,13 +110,13 @@ CDriveCleaner v2 同时处理两件事：
 
 ### 便携版
 
-下载 `CDriveCleaner-Portable-v2.3.2.zip`，**解压整个文件夹**后双击
+下载 `CDriveCleaner-Portable-v2.3.3.zip`，**解压整个文件夹**后双击
 `CDriveCleaner.exe`。目录中的 `portable.flag` 会让程序把配置和日志写在
 `data\` 子目录，整个文件夹可以放在 U 盘或移动硬盘里。
 
 > 便携版不要只复制 exe，`_internal` 目录必须一起保留。
 
-发布校验信息与安装/卸载验证见 [docs/RELEASE-v2.3.2.md](docs/RELEASE-v2.3.2.md)。
+发布校验信息与安装/卸载验证见 [docs/RELEASE-v2.3.3.md](docs/RELEASE-v2.3.3.md)。
 
 ### 系统要求
 
@@ -234,8 +234,8 @@ python -m PyInstaller --noconfirm --clean packaging\CDriveCleaner.spec
 
 ```
 dist/CDriveCleaner/CDriveCleaner.exe
-dist/CDriveCleaner-Portable-v2.3.2.zip
-dist/CDriveCleaner-Setup-v2.3.2.exe
+dist/CDriveCleaner-Portable-v2.3.3.zip
+dist/CDriveCleaner-Setup-v2.3.3.exe
 ```
 
 ## 项目结构
