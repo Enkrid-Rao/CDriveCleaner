@@ -16,7 +16,9 @@ from pathlib import Path
 from typing import Any
 
 from .. import paths
-from .models import MODE_COPY, MODE_MOVE
+from .models import (
+    LAYOUT_FLAT, LAYOUT_MIRROR, MODE_COPY, MODE_MOVE, archive_dest,
+)
 
 SCHEMA_VERSION = 2
 APP_SECTION = "storage"
@@ -161,6 +163,12 @@ def _archive_mode(value: Any) -> str:
     return MODE_COPY if text == MODE_COPY else MODE_MOVE
 
 
+def _archive_layout(value: Any) -> str:
+    """归档目录结构：默认保留归档前的完整路径，只有显式 flat 才按目录名。"""
+    text = str(value or "").strip().lower()
+    return LAYOUT_FLAT if text == LAYOUT_FLAT else LAYOUT_MIRROR
+
+
 def _default_config() -> dict[str, Any]:
     return {
         "version": SCHEMA_VERSION,
@@ -172,6 +180,7 @@ def _default_config() -> dict[str, Any]:
             "temp_retention_days": 1,
             "default_mode": MODE_MOVE,
             "keep_source_dir": True,
+            "archive_layout": LAYOUT_MIRROR,
         },
         "safety": {
             "check_locks": True,
@@ -337,6 +346,7 @@ class Config:
     temp_retention_days: int = 1
     default_mode: str = MODE_MOVE
     keep_source_dir: bool = True
+    archive_layout: str = LAYOUT_MIRROR
     strict_verify: bool = False
     check_locks: bool = True
     confirm_high_risk: bool = True
@@ -397,6 +407,10 @@ class Config:
         from .windows import path_within
         return bool(self.link_root) and path_within(path, self.link_root)
 
+    def archive_dest_for(self, source: str, root: str | None = None) -> str:
+        """按当前「归档目录结构」算出 source 的目标路径。"""
+        return archive_dest(root or self.archive_root, source, self.archive_layout)
+
     def storage_dict(self) -> dict[str, Any]:
         return {
             "link_root": self.link_root,
@@ -419,6 +433,7 @@ class Config:
             "temp_retention_days": self.temp_retention_days,
             "default_mode": self.default_mode,
             "keep_source_dir": self.keep_source_dir,
+            "archive_layout": self.archive_layout,
         })
         raw.setdefault("safety", {})
         raw["safety"].update({
@@ -575,6 +590,7 @@ def load_config(path: str | Path | None = None, *, create: bool = True) -> Confi
         # 归档不再提供「链接归档」，老配置里的 link 一律归到移动归档
         default_mode=_archive_mode(storage.get("default_mode")),
         keep_source_dir=bool(storage.get("keep_source_dir", True)),
+        archive_layout=_archive_layout(storage.get("archive_layout")),
         strict_verify=bool(safety.get("strict_verify", False)),
         check_locks=bool(safety.get("check_locks", True)),
         confirm_high_risk=bool(safety.get("confirm_high_risk", True)),

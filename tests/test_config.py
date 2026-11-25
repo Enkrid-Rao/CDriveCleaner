@@ -64,6 +64,26 @@ class ConfigTests(unittest.TestCase):
         self.assertTrue(cfg.warnings)
         self.assertEqual(cfg.raw["version"], 2)
 
+    def test_archive_layout_mirror_and_flat(self):
+        path = Path(tempfile.mkdtemp(prefix="cfg_layout_")) / "config.json"
+        cfg = config.load_config(path)
+        cfg.archive_root = "E:\\"
+        self.assertEqual(cfg.archive_layout, "mirror")
+        self.assertEqual(
+            os.path.normcase(cfg.archive_dest_for(r"C:\Users\raoxi\Downloads")),
+            os.path.normcase(r"E:\C\Users\raoxi\Downloads"))
+        self.assertEqual(
+            os.path.normcase(cfg.archive_dest_for(r"D:\Projects\Foo")),
+            os.path.normcase(r"E:\D\Projects\Foo"))
+
+        cfg.archive_layout = "flat"
+        cfg.save()
+        reloaded = config.load_config(path)
+        self.assertEqual(reloaded.archive_layout, "flat")
+        self.assertEqual(
+            os.path.normcase(reloaded.archive_dest_for(r"C:\Users\raoxi\Downloads")),
+            os.path.normcase(r"E:\Downloads"))
+
     def test_keep_source_dir_default_and_roundtrip(self):
         path = Path(tempfile.mkdtemp(prefix="cfg_keep_")) / "config.json"
         cfg = config.load_config(path)

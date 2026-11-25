@@ -342,6 +342,33 @@ MODE_LABELS = {
     MODE_COPY: "仅复制",
 }
 
+# ---------- 归档目录结构 ----------
+LAYOUT_MIRROR = "mirror"   # <归档根>\C\Users\你\Downloads —— 保留归档前的完整路径
+LAYOUT_FLAT = "flat"       # <归档根>\Downloads —— 只按目录名同级摆放
+LAYOUT_LABELS = {
+    LAYOUT_MIRROR: "保留原路径",
+    LAYOUT_FLAT: "按目录名",
+}
+
+
+def archive_dest(root: str, source: str, layout: str = LAYOUT_MIRROR) -> str:
+    """算出 source 归档到 root 之下的目标路径。
+
+    - 保留原路径：`E:\\` + `C` + `\\Users\\raoxi\\Downloads` → `E:\\C\\Users\\raoxi\\Downloads`
+    - 按目录名：`E:\\Downloads`
+    """
+    root = os.path.abspath(root)
+    src = os.path.abspath(source)
+    name = os.path.basename(src.rstrip("\\/")) or src
+    if layout != LAYOUT_MIRROR:
+        return os.path.join(root, name)
+    drive, tail = os.path.splitdrive(src)
+    letter = (drive or "").rstrip(":").upper()
+    tail = tail.strip("\\/")
+    if not letter:
+        return os.path.join(root, name)
+    return os.path.join(root, letter, tail) if tail else os.path.join(root, letter)
+
 
 @dataclass
 class OperationItem:

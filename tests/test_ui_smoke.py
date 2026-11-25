@@ -10,6 +10,7 @@ from PySide6.QtGui import QColor, QPalette  # noqa: E402
 from PySide6.QtWidgets import QApplication, QDialogButtonBox  # noqa: E402
 
 from cdc.app import ensure_fonts  # noqa: E402
+from cdc.core.models import LAYOUT_FLAT, LAYOUT_MIRROR, ArchiveCandidate  # noqa: E402
 from cdc.ui import theme  # noqa: E402
 from cdc.ui.state import AppState  # noqa: E402
 from cdc.ui.window import MainWindow  # noqa: E402
@@ -36,6 +37,25 @@ class UISmokeTests(unittest.TestCase):
             self.assertIs(window.stack.currentWidget(), window.pages[key])
         window.close()
         state.shutdown()
+
+    def test_archive_dest_follows_layout(self):
+        state = AppState()
+        window = MainWindow(state)
+        page = window.pages["archive"]
+        try:
+            cand = ArchiveCandidate(name="Downloads", path=r"C:\Users\raoxi\Downloads",
+                                    size_bytes=1, file_count=0,
+                                    newest_ts=0.0, oldest_ts=0.0)
+            page.layout_pick.set_value(LAYOUT_MIRROR)
+            mirror = page._dest_for(cand)
+            self.assertTrue(mirror.endswith(r"C\Users\raoxi\Downloads"), mirror)
+            page.layout_pick.set_value(LAYOUT_FLAT)
+            flat = page._dest_for(cand)
+            self.assertTrue(flat.endswith("Downloads"), flat)
+            self.assertNotEqual(os.path.normcase(mirror), os.path.normcase(flat))
+        finally:
+            window.close()
+            state.shutdown()
 
     def test_dark_system_still_renders_light(self):
         """系统深色模式下也必须拿到浅底 + 深字（曾经导致目录选择框黑底黑字）。"""

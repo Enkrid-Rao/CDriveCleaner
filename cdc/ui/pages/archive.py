@@ -15,9 +15,10 @@ from PySide6.QtWidgets import (
 
 from ...core import windows
 from ...core.models import (
-    ACTION_ARCHIVE, MODE_COPY, MODE_LABELS, MODE_LINK, MODE_MOVE,
-    TIER_LABELS, TIER_OPTIONAL, TIER_RECOMMEND, TIER_SKIP, TIER_STRONG,
-    ArchiveCandidate, OperationItem, human_bytes,
+    ACTION_ARCHIVE, LAYOUT_FLAT, LAYOUT_MIRROR, MODE_COPY, MODE_LABELS,
+    MODE_LINK, MODE_MOVE, TIER_LABELS, TIER_OPTIONAL, TIER_RECOMMEND,
+    TIER_SKIP, TIER_STRONG, ArchiveCandidate, OperationItem, archive_dest,
+    human_bytes,
 )
 from .. import theme
 from ..widgets import (
@@ -193,6 +194,7 @@ class ArchivePage(QWidget):
         state.analysis_finished.connect(self._on_analysis_finished)
         state.analysis_failed.connect(self._on_analysis_failed)
         state.drives_changed.connect(lambda _d: self._refresh_drives())
+        state.config_changed.connect(self._sync_options_from_config)
 
     # ---------- 构建 ----------
 
@@ -226,7 +228,7 @@ class ArchivePage(QWidget):
         top.setSpacing(14)
         self.dest_card = GlassCard(18, 11)
         self.dest_card.add(card_header(
-            "归档到", "选中的目录会按目录名放到该路径下，同级排列"))
+            "归档到", "按「目录结构」放到该路径下；设置里也能改"))
         self.drive_row = QHBoxLayout()
         self.drive_row.setSpacing(9)
         self.dest_card.add_layout(self.drive_row)
@@ -251,6 +253,25 @@ class ArchivePage(QWidget):
         self.strict_check.setChecked(self.state.config.strict_verify)
         mode_row.addWidget(self.strict_check)
         self.dest_card.add_layout(mode_row)
+
+        options_row = QHBoxLayout()
+        options_row.setSpacing(10)
+        options_row.addWidget(label("目录结构", "Label"))
+        self.layout_pick = SegmentedControl(
+            [(LAYOUT_MIRROR, "保留原路径"), (LAYOUT_FLAT, "按目录名")],
+            self.state.config.archive_layout,
+        )
+        self.layout_pick.changed.connect(self._on_layout_changed)
+        options_row.addWidget(self.layout_pick)
+        options_row.addStretch()
+        self.keep_dir = Check("归档后保留原目录")
+        self.keep_dir.setChecked(self.state.config.keep_source_dir)
+        self.keep_dir.setToolTip(
+            "开启：只清空内容、保留目录骨架，源目录仍在；关闭：连源目录本身一起删除。")
+        self.keep_dir.toggled.connect(self._on_keep_dir_changed)
+        options_row.addWidget(self.keep_dir)
+        self.dest_card.add_layout(options_row)
+
         self.mode_note = QLabel("")
         self.mode_note.setObjectName("Muted")
         self.mode_note.setWordWrap(True)
@@ -648,8 +669,41 @@ class ArchivePage(QWidget):
         self._refresh_custom_label()
 
     def _dest_for_path(self, path: str) -> str:
-        return os.path.join(self._archive_root(),
-                            os.path.basename(path.rstrip("\\/")) or path)
+        return archive_dest(self._archive_root(), path, self.layout_pick.value())
+
+    def _on_layout_changed(self, layout: str) -> None:
+        cfg = self.state.config
+        cfg.archive_layout = layout
+        self._persist_options()
+        if self.state.analysis.candidates:
+            self._render()
+        self._update_plan()
+
+    def _on_keep_dir_changed(self, checked: bool) -> None:
+        if getattr(self, "_syncing_options", False):
+            return
+        self.state.config.keep_source_dir = bool(checked)
+        self._persist_options()
+        self._on_mode(self.mode.value())
+
+    def _persist_options(self) -> None:
+        try:
+            self.state.config.save()
+        except OSError:
+            pass
+
+    def _sync_options_from_config(self) -> None:
+        """设置页改了这两项后，归档页的控件跟着变。"""
+        cfg = self.state.config
+        self._syncing_options = True
+        try:
+            self.layout_pick.set_value(cfg.archive_layout)
+            self.keep_dir.setChecked(cfg.keep_source_dir)
+        finally:
+            self._syncing_options = False
+        if self.state.analysis.candidates:
+            self._render()
+        self._update_plan()
 
     def _duplicate_dests(self, items: list[OperationItem]) -> list[str]:
         seen: dict[str, str] = {}
@@ -865,7 +919,7 @@ class ArchivePage(QWidget):
         self._update_plan()
 
     def _dest_for(self, cand: ArchiveCandidate) -> str:
-        return os.path.join(self._archive_root(), cand.name)
+        return archive_dest(self._archive_root(), cand.path, self.layout_pick.value())
 
     def _make_items(self, candidates: list[ArchiveCandidate]) -> list[OperationItem]:
         mode = self.mode.value()

@@ -69,7 +69,10 @@ CDriveCleaner v2 同时处理两件事：
   1. **移动归档**（默认）：复制 → 校验 → **清空源目录内容、保留目录骨架**，空间立即释放。
      可在设置里关掉「归档后保留原目录」，改为连源目录本身一起删除。
   2. **仅复制**：只复制并校验，源目录原样保留，用于先备份。
-- **自定义目录（可多选）**：冷数据推荐之外，可选择任意多个目录直接归档；移动归档后目录本身和子目录结构仍然保留，并按目录名同级放到目标路径。
+- **自定义目录（可多选）**：冷数据推荐之外，可选择任意多个目录直接归档；移动归档后目录本身和子目录结构仍然保留。
+- **归档目录结构**（设置页与归档页都能改）：
+  - **保留原路径**（默认）：`E:\C\Users\你\Downloads\Software`，完整保留归档前的盘符与路径；
+  - **按目录名**：`E:\Software`，只按目录名同级摆放。
 - **自动更新**：启动时每天检查一次 GitHub Release；安装版下载 Setup 静默覆盖安装，便携版退出后覆盖程序目录并重启；下载后做 SHA256 校验。详见 [docs/UPDATE.md](docs/UPDATE.md)。
 - **已链接冷数据二次归档**：如果目录本身已经是 Junction（之前用「C 盘瘦身」迁过），
   工具会把真实数据搬到 E 盘，并**把链接改指**到新位置——这种情况删掉链接会让原路径消失、
@@ -98,7 +101,7 @@ CDriveCleaner v2 同时处理两件事：
 
 ### 安装版（推荐）
 
-下载 `CDriveCleaner-Setup-v2.3.1.exe`，双击安装。默认安装到当前用户目录，
+下载 `CDriveCleaner-Setup-v2.3.2.exe`，双击安装。默认安装到当前用户目录，
 无需管理员权限；也可以选择为所有用户安装。
 
 - 开始菜单 / 可选桌面快捷方式
@@ -107,13 +110,13 @@ CDriveCleaner v2 同时处理两件事：
 
 ### 便携版
 
-下载 `CDriveCleaner-Portable-v2.3.1.zip`，**解压整个文件夹**后双击
+下载 `CDriveCleaner-Portable-v2.3.2.zip`，**解压整个文件夹**后双击
 `CDriveCleaner.exe`。目录中的 `portable.flag` 会让程序把配置和日志写在
 `data\` 子目录，整个文件夹可以放在 U 盘或移动硬盘里。
 
 > 便携版不要只复制 exe，`_internal` 目录必须一起保留。
 
-发布校验信息与安装/卸载验证见 [docs/RELEASE-v2.3.1.md](docs/RELEASE-v2.3.1.md)。
+发布校验信息与安装/卸载验证见 [docs/RELEASE-v2.3.2.md](docs/RELEASE-v2.3.2.md)。
 
 ### 系统要求
 
@@ -160,7 +163,7 @@ python -m cdc --diagnose
 ```
 归档前： C:\Users\你\Downloads\Software        (5 GB，真实目录)
 归档后： C:\Users\你\Downloads\Software        空目录（默认保留骨架；可在设置里关掉）
-        E:\Software                            (5 GB，真实目录)
+        E:\C\Users\你\Downloads\Software      (5 GB，真实目录，默认「保留原路径」)
 ```
 
 关掉「归档后保留原目录」后，源目录本身也会被删除，效果与剪切 + 粘贴完全一致。
@@ -174,13 +177,15 @@ python -m cdc --diagnose
         D 盘旧目标已删除，C 盘路径不变
 ```
 
-选中多个目录时，它们会按**目录名**同级放到目标路径下：
+选中多个目录时，默认按**原路径**放到归档根下（去掉盘符的冒号，其余原样）：
 
 ```
-目标路径：E:\
+归档根：E:\
 选中：D:\Downloads\Software、D:\Downloads\ISO
-结果：E:\Software、E:\ISO
+结果：E:\D\Downloads\Software、E:\D\Downloads\ISO
 ```
+
+在设置里把「归档目录结构」改成「按目录名」，就会变成 `E:\Software`、`E:\ISO`。
 
 ### 为什么不用 robocopy /MOVE
 
@@ -229,8 +234,8 @@ python -m PyInstaller --noconfirm --clean packaging\CDriveCleaner.spec
 
 ```
 dist/CDriveCleaner/CDriveCleaner.exe
-dist/CDriveCleaner-Portable-v2.3.1.zip
-dist/CDriveCleaner-Setup-v2.3.1.exe
+dist/CDriveCleaner-Portable-v2.3.2.zip
+dist/CDriveCleaner-Setup-v2.3.2.exe
 ```
 
 ## 项目结构

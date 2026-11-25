@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 
 from ... import paths
 from ...core import windows
-from ...core.models import MODE_COPY, MODE_MOVE
+from ...core.models import LAYOUT_FLAT, LAYOUT_MIRROR, MODE_COPY, MODE_MOVE
 from ...version import __version__
 from .. import theme
 from ..widgets import (
@@ -71,7 +71,7 @@ class SettingsPage(ScrollPage):
         archive.add(card_header("冷数据归档", "机械盘 / 外置盘与默认归档方式"))
         self.archive_root = PathPicker(self.state.config.archive_root,
                                        r"例如 E:\ColdStore")
-        archive.add(FormRow("默认归档路径", "选中的目录会按目录名放到该路径下（同级）。",
+        archive.add(FormRow("默认归档路径", "选中目录按下面的「归档目录结构」放到该路径下。",
                             self.archive_root, stretch=True))
         self.archive_min = QSpinBox()
         self.archive_min.setRange(50, 51200)
@@ -91,6 +91,14 @@ class SettingsPage(ScrollPage):
             "归档后保留原目录",
             "开启时只清空内容、保留骨架；关闭则连目录一起删除。",
             self.keep_source_dir))
+        self.archive_layout = SegmentedControl(
+            [(LAYOUT_MIRROR, "保留原路径"), (LAYOUT_FLAT, "按目录名")],
+            self.state.config.archive_layout,
+        )
+        archive.add(FormRow(
+            "归档目录结构",
+            "保留原路径：E:\\C\\Users\\你\\Downloads；按目录名：E:\\Downloads。",
+            self.archive_layout))
         self.strict_verify = Check("严格校验（SHA256）")
         self.strict_verify.setChecked(self.state.config.strict_verify)
         archive.add(FormRow("校验强度", "开启后逐文件计算哈希，更稳但明显更慢。",
@@ -228,6 +236,7 @@ class SettingsPage(ScrollPage):
         self.archive_min.setValue(cfg.archive_min_mb)
         self.default_mode.set_value(cfg.default_mode)
         self.keep_source_dir.setChecked(cfg.keep_source_dir)
+        self.archive_layout.set_value(cfg.archive_layout)
         self.strict_verify.setChecked(cfg.strict_verify)
         self.check_locks.setChecked(cfg.check_locks)
         self.confirm_high.setChecked(cfg.confirm_high_risk)
@@ -264,6 +273,7 @@ class SettingsPage(ScrollPage):
         cfg.archive_min_mb = self.archive_min.value()
         cfg.default_mode = self.default_mode.value()
         cfg.keep_source_dir = self.keep_source_dir.isChecked()
+        cfg.archive_layout = self.archive_layout.value()
         cfg.strict_verify = self.strict_verify.isChecked()
         cfg.check_locks = self.check_locks.isChecked()
         cfg.confirm_high_risk = self.confirm_high.isChecked()
