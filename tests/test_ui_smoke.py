@@ -5,14 +5,16 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from tests import base  # noqa: E402,F401  (设置 CDC_DATA_DIR)
+from tests import base  # noqa: E402  (设置 CDC_DATA_DIR)
+from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtGui import QColor, QPalette  # noqa: E402
-from PySide6.QtWidgets import QApplication, QDialogButtonBox  # noqa: E402
+from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from cdc.app import ensure_fonts  # noqa: E402
 from cdc.core.models import LAYOUT_FLAT, LAYOUT_MIRROR, ArchiveCandidate  # noqa: E402
 from cdc.ui import theme  # noqa: E402
 from cdc.ui.state import AppState  # noqa: E402
+from cdc.core import windows  # noqa: E402
 from cdc.ui.window import MainWindow  # noqa: E402
 
 
@@ -73,26 +75,48 @@ class UISmokeTests(unittest.TestCase):
         finally:
             theme.apply_app_theme(self.app)
 
-    def test_dir_dialog_is_readable_and_chinese(self):
+    def test_dir_picker_lists_hidden_and_junction_dirs(self):
+        """回归：选择器进入 Junction / 隐藏目录时必须能列出子目录。"""
+        tree_root, _extra = base.temp_tree("picker")
+        (tree_root / ".hidden_dir" / "sub").mkdir(parents=True)
+        (tree_root / "plain").mkdir()
+        target = tree_root / "target"
+        (target / "inner").mkdir(parents=True)
+        ok, err = windows.create_junction(str(tree_root / "linked"), str(target))
+        self.assertTrue(ok, err)
+
         state = AppState()
         self.app.setStyleSheet(theme.build_qss(13, False))
         window = MainWindow(state)
         window.show()
         self.app.processEvents()
-        dialog = window.pages["archive"]._dir_dialog("C:\\")
+        dialog = window.pages["archive"]._dir_dialog(str(tree_root))
         try:
-            palette = dialog.palette()
-            self.assertGreater(palette.base().color().lightness(), 200)
-            self.assertLess(palette.text().color().lightness(), 80)
-            box = dialog.findChild(QDialogButtonBox)
-            accept = next(button for button in box.buttons()
-                          if box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole)
-            self.assertEqual(accept.text(), "添加选中")
-            self.assertEqual(accept.objectName(), "Primary")
+            tree = dialog.tree
+            names = [tree.topLevelItem(i).text(0).replace("  →", "")
+                     for i in range(tree.topLevelItemCount())]
+            self.assertIn(".hidden_dir", names)
+            self.assertIn("plain", names)
+            self.assertIn("linked", names)
+            self.assertEqual(dialog.btn_ok.text(), "添加选中")
+            self.assertEqual(dialog.btn_ok.objectName(), "Primary")
+
+            linked = next(tree.topLevelItem(i) for i in range(tree.topLevelItemCount())
+                          if tree.topLevelItem(i).text(0).startswith("linked"))
+            linked.setExpanded(True)
+            self.app.processEvents()
+            inner = [linked.child(i).text(0) for i in range(linked.childCount())]
+            self.assertIn("inner", inner)
+
+            linked.setCheckState(0, Qt.CheckState.Checked)
+            self.app.processEvents()
+            dialog._accept()
+            self.assertEqual(dialog.picked, [str(tree_root / "linked")])
         finally:
             dialog.close()
             window.close()
             state.shutdown()
+            base.cleanup(tree_root)
 
 
 if __name__ == "__main__":

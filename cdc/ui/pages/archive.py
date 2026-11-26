@@ -7,9 +7,8 @@ from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog,
-    QDialogButtonBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
-    QListView, QProgressBar, QPushButton, QScrollArea, QSpinBox, QTreeView,
+    QApplication, QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout,
+    QLabel, QProgressBar, QPushButton, QScrollArea, QSpinBox,
     QVBoxLayout, QWidget,
 )
 
@@ -21,6 +20,7 @@ from ...core.models import (
     human_bytes,
 )
 from .. import theme
+from ..dir_picker import DirPickerDialog
 from ..widgets import (
     Check, ConfirmDialog, DriveCard, ElidedLabel, EmptyState, GlassCard,
     IconButton, IconTile, PageHeader, PathPicker, Pill, ScrollPage,
@@ -64,26 +64,6 @@ def _category_icon(candidate: ArchiveCandidate) -> tuple[str, str]:
     }.get(top, ("folder", "muted"))
 
 
-class _DirPickerDialog(QFileDialog):
-    """可选多个目录的 QFileDialog。
-
-    Qt 的非原生 QFileDialog 在文件模式下把「选中目录 + 确认」当成导航：
-    点确认后它会打开那个目录，对话框不关，于是多选目录永远拿不到结果。
-    这里重写 accept()，确认时直接把选中的目录收进 picked。
-    """
-
-    def __init__(self, parent: QWidget | None, title: str) -> None:
-        super().__init__(parent, title)
-        self.picked: list[str] = []
-
-    def accept(self) -> None:  # noqa: N802
-        paths = [p for p in self.selectedFiles() if os.path.isdir(p)]
-        if not paths:
-            return  # 什么都没选：保持打开，等用户选择或取消
-        self.picked = paths
-        QDialog.accept(self)  # 跳过 QFileDialog 的「进入目录」逻辑
-
-
 class ArchiveRow(QFrame):
     toggled = Signal(str, bool)
     archive = Signal(object)
@@ -116,6 +96,11 @@ class ArchiveRow(QFrame):
         top.addWidget(Pill(candidate.tier_label, TIER_TONES.get(candidate.tier, "muted")))
         top.addWidget(Pill(f"{candidate.source_drive}:", {"C": "c", "D": "d"}.get(
             candidate.source_drive, "muted")))
+        if candidate.parent_name:
+            parent = Pill(f"在 {candidate.parent_name} 里", "muted")
+            parent.setToolTip(
+                f"父目录：{candidate.parent_name}\n这是它的子目录，单独归档更精准")
+            top.addWidget(parent)
         if candidate.is_junction:
             linked = Pill("已链接", "purple")
             linked.setToolTip(f"当前指向：{candidate.target_path}")
@@ -570,66 +555,9 @@ class ArchivePage(QWidget):
                 rows.append((path, os.path.basename(path.rstrip("\\/")) or "自定义目录"))
         return rows
 
-    def _dir_dialog(self, start: str) -> _DirPickerDialog:
-        """构建「可多选目录」的非原生 QFileDialog。
-
-        Qt 的目录选择本身不支持多选，这里用 ShowDirsOnly + ExistingFiles
-        把内部的列表改成多选；配色由主题的浅色调色板 + QSS 保证可读。
-        """
-        dialog = _DirPickerDialog(self.window(), "选择要归档的目录（可多选）")
-        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
-        dialog.setOption(QFileDialog.ShowDirsOnly, True)
-        dialog.setFileMode(QFileDialog.ExistingFiles)
-        dialog.setDirectory(start)
-        views = list(dialog.findChildren(QListView)) + list(dialog.findChildren(QTreeView))
-        tip = "Ctrl / Shift + 单击可多选目录；双击进入目录"
-        for view in views:
-            view.setSelectionMode(QAbstractItemView.ExtendedSelection)
-            view.setToolTip(tip)
-        dialog.setLabelText(QFileDialog.DialogLabel.LookIn, "当前位置")
-        dialog.setLabelText(QFileDialog.DialogLabel.FileName, "目录")
-        dialog.setLabelText(QFileDialog.DialogLabel.FileType, "类型")
-        dialog.setLabelText(QFileDialog.DialogLabel.Reject, "取消")
-        # 文件夹模式下「文件类型」没有意义，隐藏整行
-        for name in ("fileTypeLabel", "fileTypeCombo"):
-            widget = dialog.findChild(QWidget, name)
-            if widget is not None:
-                widget.hide()
-        # 侧栏最宽条目决定最小宽度，避免 "My Computer" 被省略成 "My Com…"
-        sidebar = dialog.findChild(QListView, "sidebar")
-        if sidebar is not None and sidebar.model() is not None:
-            model = sidebar.model()
-            metrics = sidebar.fontMetrics()
-            widest = max((metrics.horizontalAdvance(model.index(row, 0).data(Qt.DisplayRole) or "")
-                          for row in range(model.rowCount())), default=0)
-            if widest:
-                sidebar.setMinimumWidth(widest + 56)
-        # 确认按钮：主色样式 + 中文文案。Qt 每次选目录都会把按钮文字改回
-        # 英文的 "&Open"，所以每次选择变化后都要重新写一遍。
-        box = dialog.findChild(QDialogButtonBox, "buttonBox")
-        accept = None
-        if box is not None:
-            for button in box.buttons():
-                if box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
-                    accept = button
-                    break
-        if accept is not None:
-            accept.setObjectName("Primary")
-            accept.setMinimumWidth(108)
-            accept.style().unpolish(accept)
-            accept.style().polish(accept)
-
-            def relabel(*_args) -> None:
-                accept.setText("添加选中")
-
-            dialog.directoryEntered.connect(relabel)
-            for view in views:
-                selection = view.selectionModel()
-                if selection is not None:
-                    selection.selectionChanged.connect(relabel)
-                    selection.currentChanged.connect(relabel)
-            relabel()
-        return dialog
+    def _dir_dialog(self, start: str) -> DirPickerDialog:
+        """打开自绘的目录树多选器（不依赖 QFileDialog 的目录模式）。"""
+        return DirPickerDialog(self.window(), start)
 
     def _pick_custom_root(self) -> None:
         start = self.custom_dirs[-1] if self.custom_dirs else (self._archive_root() or "D:\\")
@@ -814,8 +742,7 @@ class ArchivePage(QWidget):
         self.btn_analyze.setEnabled(True)
         self.analysis_bar.hide()
         self.btn_cancel_analysis.hide()
-        self.analysis_state.setText(
-            f"上次分析 {fmt_time(result.scanned_at)} · {len(result.candidates)} 个目录")
+        self.analysis_state.setText(self._summary_text())
         self.selected.clear()
         self.refresh()
 
@@ -831,10 +758,21 @@ class ArchivePage(QWidget):
     def refresh(self) -> None:
         analysis = self.state.analysis
         if analysis.scanned_at:
-            self.analysis_state.setText(
-                f"上次分析 {fmt_time(analysis.scanned_at)} · {len(analysis.candidates)} 个目录")
+            self.analysis_state.setText(self._summary_text())
         self._render()
         self._update_plan()
+
+    def _summary_text(self) -> str:
+        analysis = self.state.analysis
+        if not analysis.scanned_at:
+            return ""
+        total = sum(c.size_bytes for c in analysis.candidates)
+        recommended = [c for c in analysis.candidates
+                       if c.tier in (TIER_STRONG, TIER_RECOMMEND)]
+        rec_bytes = sum(c.size_bytes for c in recommended)
+        return (f"上次分析 {fmt_time(analysis.scanned_at)} · "
+                f"{len(analysis.candidates)} 个目录 · 共 {fmt_size(total)} · "
+                f"推荐 {len(recommended)} 个（{fmt_size(rec_bytes)}）")
 
     def _clear_rows(self) -> None:
         clear_layout(self.rows_box)

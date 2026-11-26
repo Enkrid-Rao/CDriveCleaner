@@ -62,7 +62,8 @@ CDriveCleaner v2 同时处理两件事：
 - **目标盘识别**：枚举卷 → 分区 → 物理盘，标注 SSD / 机械硬盘 / USB 外置盘；
   默认推荐非系统盘。
 - **冷数据判据**：扩展名构成（视频 / 镜像 / 安装包 / 压缩包 / 模型 / 图片）、
-  最后修改时间、文件平均大小。
+  最后修改时间、文件平均大小；体积大且构成混合的目录（如 `Downloads`）会再展开一层，
+  把 `Software`、`ISOs` 这类真正该归档的子目录单独列出来。
   - 推荐：影视、ISO、虚拟机镜像、安装包、模型权重、照片素材、长期未动的归档。
   - 不推荐：聊天数据库、代码仓库、`node_modules`、浏览器缓存、IDE 索引。
 - **两种模式**（都不会在原位置留下链接）：
@@ -101,7 +102,7 @@ CDriveCleaner v2 同时处理两件事：
 
 ### 安装版（推荐）
 
-下载 `CDriveCleaner-Setup-v2.3.3.exe`，双击安装。默认安装到当前用户目录，
+下载 `CDriveCleaner-Setup-v2.3.4.exe`，双击安装。默认安装到当前用户目录，
 无需管理员权限；也可以选择为所有用户安装。
 
 - 开始菜单 / 可选桌面快捷方式
@@ -110,13 +111,13 @@ CDriveCleaner v2 同时处理两件事：
 
 ### 便携版
 
-下载 `CDriveCleaner-Portable-v2.3.3.zip`，**解压整个文件夹**后双击
+下载 `CDriveCleaner-Portable-v2.3.4.zip`，**解压整个文件夹**后双击
 `CDriveCleaner.exe`。目录中的 `portable.flag` 会让程序把配置和日志写在
 `data\` 子目录，整个文件夹可以放在 U 盘或移动硬盘里。
 
 > 便携版不要只复制 exe，`_internal` 目录必须一起保留。
 
-发布校验信息与安装/卸载验证见 [docs/RELEASE-v2.3.3.md](docs/RELEASE-v2.3.3.md)。
+发布校验信息与安装/卸载验证见 [docs/RELEASE-v2.3.4.md](docs/RELEASE-v2.3.4.md)。
 
 ### 系统要求
 
@@ -234,8 +235,8 @@ python -m PyInstaller --noconfirm --clean packaging\CDriveCleaner.spec
 
 ```
 dist/CDriveCleaner/CDriveCleaner.exe
-dist/CDriveCleaner-Portable-v2.3.3.zip
-dist/CDriveCleaner-Setup-v2.3.3.exe
+dist/CDriveCleaner-Portable-v2.3.4.zip
+dist/CDriveCleaner-Setup-v2.3.4.exe
 ```
 
 ## 项目结构

@@ -240,6 +240,8 @@ class ArchiveCandidate:
     target_path: str = ""
     warnings: list[str] = field(default_factory=list)
     source_root: str = ""
+    parent_name: str = ""
+    depth: int = 1
 
     @property
     def tier_label(self) -> str:

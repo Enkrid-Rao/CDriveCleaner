@@ -289,6 +289,9 @@ SKIP_DIR_NAMES = {
     "recent", "sendto", "templates", "cookies", "history", "onedrive",
     "documents and settings", "desktop", "workbuddy ai",
 }
+MAX_CHILD_PARENTS = 4        # 最多展开几个「混合」父目录
+CHILD_PARENT_MIN_BYTES = 2 * 1024 ** 3   # 父目录至少这么大才值得展开
+MAX_CHILD_CANDIDATES = 40    # 二级候选上限
 SKIP_IF_SMALL = {
     "downloads": 1024 ** 3,
     "videos": 1024 ** 3,
@@ -491,6 +494,80 @@ def analyze_cold(
         if stats.errors:
             cand.warnings.append(f"{len(stats.errors)} 个文件无法读取（可能被占用）")
         result.candidates.append(cand)
+
+    # ---- 二级展开：大而“混合”的目录，真正该归档的往往是它的子目录 ----
+    # 例如 Downloads 整体只能算「可选」，但 Downloads\Software / ISOs 是明确的安装包与镜像。
+    # 父目录不限于「可选 / 推荐」：像 D:\\Projects 这种因为小文件多被判 SKIP 的大目录，
+    # 里面照样可能躺着 90 GB 的冷数据（例如 Sill-Promo 的 .raw 采集文件）。
+    parents = sorted(
+        (c for c in result.candidates
+         if c.size_bytes >= CHILD_PARENT_MIN_BYTES and not c.is_junction),
+        key=lambda c: -c.size_bytes,
+    )[:MAX_CHILD_PARENTS]
+    if parents:
+        _emit(progress, phase="展开子目录", percent=88,
+              message=f"展开 {len(parents)} 个混合目录，看冷数据到底在哪一层…")
+        child_rows: list[tuple[ArchiveCandidate, windows.DirEntryInfo]] = []
+        root_paths = [r[0] for r in root_list]
+        for parent in parents:
+            if cancel and cancel():
+                break
+            for entry in windows.child_directories(parent.path):
+                if entry.is_link:
+                    continue
+                if len(child_rows) >= MAX_CHILD_CANDIDATES:
+                    break
+                if _is_excluded_candidate(entry.path, entry.name, config, root_paths):
+                    continue
+                child_rows.append((parent, entry))
+        child_stats: dict[str, windows.DirStats] = {}
+        batch = 10
+        for start in range(0, len(child_rows), batch):
+            if cancel and cancel():
+                break
+            chunk = child_rows[start:start + batch]
+            with ThreadPoolExecutor(max_workers=min(5, len(chunk))) as pool:
+                futures = {pool.submit(_candidate_stats, entry.path, cancel): entry
+                           for _parent, entry in chunk}
+                for future in as_completed(futures):
+                    entry = futures[future]
+                    try:
+                        child_stats[entry.path] = future.result()
+                    except Exception as exc:
+                        child_stats[entry.path] = windows.DirStats(errors=[str(exc)])
+        existing = {os.path.normcase(c.path) for c in result.candidates}
+        for parent, entry in child_rows:
+            if os.path.normcase(entry.path) in existing:
+                continue
+            stats = child_stats.get(entry.path) or windows.DirStats()
+            if stats.bytes < min_size:
+                continue
+            tier, score, reason, warnings = classify_cold(
+                entry.name, stats, size_min_bytes=min_size,
+                source_drive=windows.drive_of(entry.path))
+            if tier == TIER_SKIP:
+                continue
+            cand = ArchiveCandidate(
+                name=entry.name,
+                path=entry.path,
+                size_bytes=stats.bytes,
+                file_count=stats.files,
+                newest_ts=stats.newest,
+                oldest_ts=stats.oldest,
+                ext_bytes=dict(stats.ext_bytes),
+                tier=tier,
+                score=score,
+                reason=f"在「{parent.name}」里 · {reason}",
+                dest_path=config.archive_dest_for(entry.path),
+                source_drive=windows.drive_of(entry.path),
+                warnings=warnings,
+                source_root=parent.source_root,
+                parent_name=parent.name,
+                depth=2,
+            )
+            if stats.errors:
+                cand.warnings.append(f"{len(stats.errors)} 个文件无法读取（可能被占用）")
+            result.candidates.append(cand)
 
     # ---- 已通过 Junction 迁到其他盘的目录：可再次归档到机械盘并更新链接 ----
     _emit(progress, phase="检查已迁移目录", percent=92,

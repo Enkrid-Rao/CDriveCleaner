@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from unittest import mock
 
 from tests import base
 from cdc.core import scanner, windows
@@ -93,6 +94,32 @@ class ScanTests(unittest.TestCase):
         self.assertTrue(result.junctions[0].target_exists)
         self.assertEqual([p.name for p in result.protected_items], ["Protected"])
         self.assertGreater(result.potential_bytes, 0)
+
+    def _sparse(self, path, size_mb):
+        with open(path, "wb") as handle:
+            handle.seek(size_mb * 1024 ** 2 - 1)
+            handle.write(b"\0")
+
+    def test_depth2_expands_mixed_parent(self):
+        """Downloads 这种混合目录要能展开出 Software 这类真正的冷数据子目录。"""
+        zone = self.d / "zone2"
+        downloads = zone / "Downloads"
+        software = downloads / "Software"
+        software.mkdir(parents=True)
+        self._sparse(downloads / "misc.bin", 600)
+        self._sparse(software / "setup.msi", 600)
+
+        with mock.patch.object(scanner, "CHILD_PARENT_MIN_BYTES", 100 * 1024 ** 2):
+            result = scanner.analyze_cold(self.cfg, roots=[(str(zone), "测试")],
+                                          min_size_bytes=100_000)
+
+        by_name = {c.name: c for c in result.candidates}
+        self.assertIn("Downloads", by_name)
+        self.assertIsNotNone(by_name.get("Software"), list(by_name))
+        child = by_name["Software"]
+        self.assertEqual(child.parent_name, "Downloads")
+        self.assertEqual(child.depth, 2)
+        self.assertIn("Downloads", child.reason)
 
     def test_analyze_cold_candidates(self):
         media = self.zone / "Videos"
