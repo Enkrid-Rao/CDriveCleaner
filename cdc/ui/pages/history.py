@@ -293,7 +293,11 @@ class HistoryPage(ScrollPage):
             self.state.toast.emit("正在执行其它操作，等它结束再复原", "warn")
             return
         start = self.state.config.archive_root or "E:\\"
-        dialog = DirPickerDialog(self.window(), start, title="选择要复原的归档目录")
+        quick = [("archive", "归档盘", start)] if os.path.isdir(start) else []
+        dialog = DirPickerDialog(self.window(), start,
+                                 title="选择要复原的归档目录",
+                                 subtitle="选归档根目录下的某个目录，会自动反推原始路径。",
+                                 quick=quick)
         if not dialog.exec():
             return
         if len(dialog.picked) != 1:

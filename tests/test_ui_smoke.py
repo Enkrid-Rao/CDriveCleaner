@@ -119,7 +119,7 @@ class UISmokeTests(unittest.TestCase):
         dialog = window.pages["archive"]._dir_dialog(str(tree_root))
         try:
             tree = dialog.tree
-            names = [tree.topLevelItem(i).text(0).replace("  →", "")
+            names = [tree.topLevelItem(i).text(0).rstrip(" →")
                      for i in range(tree.topLevelItemCount())]
             self.assertIn(".hidden_dir", names)
             self.assertIn("plain", names)
