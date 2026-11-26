@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 import unittest
 from unittest import mock
 
@@ -99,6 +100,24 @@ class ScanTests(unittest.TestCase):
         with open(path, "wb") as handle:
             handle.seek(size_mb * 1024 ** 2 - 1)
             handle.write(b"\0")
+
+    def test_analyze_prefers_everything_index(self):
+        """Everything 可用时直接用索引统计，不再遍历目录。"""
+        zone = self.d / "zone3"
+        movies = zone / "Movies"
+        movies.mkdir(parents=True)
+        (movies / "a.mkv").write_bytes(b"x")
+        fake = windows.DirStats(bytes=10 * 1024 ** 3, files=1,
+                                newest=time.time() - 400 * 86400,
+                                ext_bytes={"mkv": 10 * 1024 ** 3})
+        with mock.patch.object(scanner.everything, "available", return_value=True), \
+                mock.patch.object(scanner.everything, "subdir_stats",
+                                  return_value={"movies": fake}):
+            result = scanner.analyze_cold(self.cfg, roots=[(str(zone), "测试")],
+                                          min_size_bytes=100)
+        cand = next(c for c in result.candidates if c.name == "Movies")
+        self.assertEqual(cand.size_bytes, 10 * 1024 ** 3)
+        self.assertEqual(cand.file_count, 1)
 
     def test_depth2_expands_mixed_parent(self):
         """Downloads 这种混合目录要能展开出 Software 这类真正的冷数据子目录。"""

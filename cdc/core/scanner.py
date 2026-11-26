@@ -15,7 +15,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Iterable
 
-from . import windows
+from . import everything, windows
 from .models import (
     AnalysisResult, ArchiveCandidate, JunctionInfo, Progress, ScanItem, ScanResult,
     TIER_OPTIONAL, TIER_RECOMMEND, TIER_SKIP, TIER_STRONG, human_bytes,
@@ -447,11 +447,36 @@ def analyze_cold(
     _emit(progress, phase="枚举候选", percent=5,
           message=f"发现 {len(candidates)} 个目录，开始统计…")
     stats_map: dict[str, windows.DirStats] = {}
+    use_index = (bool(getattr(config, "use_everything", True))
+                 and everything.available())
+    if use_index:
+        by_root: dict[str, list[windows.DirEntryInfo]] = {}
+        for root, _label, entry in candidates:
+            by_root.setdefault(root, []).append(entry)
+        for root, entries in by_root.items():
+            if cancel and cancel():
+                break
+            _emit(progress, phase="查询索引", percent=8,
+                  message="使用 Everything 索引统计目录体积…",
+                  detail=os.path.basename(root.rstrip("\\/")) or root)
+            try:
+                bucket = everything.subdir_stats(root)
+            except everything.EverythingError:
+                bucket = {}
+            for entry in entries:
+                indexed = bucket.get(entry.name.casefold())
+                if indexed is not None and indexed.files:
+                    stats_map[entry.path] = indexed
+        _emit(progress, phase="统计冷数据", percent=40,
+              message=f"索引已覆盖 {len(stats_map)}/{len(candidates)} 个目录，"
+                      f"其余逐个统计…")
+    pending = [row for row in candidates if row[2].path not in stats_map]
+    total_pending = max(1, len(pending))
     batch = 12
-    for start in range(0, len(candidates), batch):
+    for start in range(0, len(pending), batch):
         if cancel and cancel():
             break
-        chunk = candidates[start:start + batch]
+        chunk = pending[start:start + batch]
         with ThreadPoolExecutor(max_workers=min(6, len(chunk))) as pool:
             futures = {pool.submit(_candidate_stats, entry.path, cancel): entry
                        for _root, _label, entry in chunk}
@@ -461,9 +486,11 @@ def analyze_cold(
                     stats_map[entry.path] = future.result()
                 except Exception as exc:
                     stats_map[entry.path] = windows.DirStats(errors=[str(exc)])
-        done = min(len(candidates), start + batch)
-        _emit(progress, phase="统计冷数据", percent=5 + done / total * 85,
-              message=f"已分析 {done}/{len(candidates)} 个目录",
+        done = min(len(pending), start + batch)
+        base_pct = 40 if use_index else 5
+        span_pct = 50 if use_index else 85
+        _emit(progress, phase="统计冷数据", percent=base_pct + done / total_pending * span_pct,
+              message=f"已分析 {len(stats_map)}/{len(candidates)} 个目录",
               detail=chunk[-1][2].name if chunk else "")
 
     for root, label, entry in candidates:
@@ -521,11 +548,26 @@ def analyze_cold(
                     continue
                 child_rows.append((parent, entry))
         child_stats: dict[str, windows.DirStats] = {}
+        if use_index:
+            for parent in parents:
+                if cancel and cancel():
+                    break
+                try:
+                    bucket = everything.subdir_stats(parent.path)
+                except everything.EverythingError:
+                    bucket = {}
+                for _parent, entry in child_rows:
+                    if _parent is not parent or entry.path in child_stats:
+                        continue
+                    indexed = bucket.get(entry.name.casefold())
+                    if indexed is not None and indexed.files:
+                        child_stats[entry.path] = indexed
         batch = 10
-        for start in range(0, len(child_rows), batch):
+        pending_children = [row for row in child_rows if row[1].path not in child_stats]
+        for start in range(0, len(pending_children), batch):
             if cancel and cancel():
                 break
-            chunk = child_rows[start:start + batch]
+            chunk = pending_children[start:start + batch]
             with ThreadPoolExecutor(max_workers=min(5, len(chunk))) as pool:
                 futures = {pool.submit(_candidate_stats, entry.path, cancel): entry
                            for _parent, entry in chunk}

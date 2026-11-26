@@ -182,6 +182,7 @@ def _default_config() -> dict[str, Any]:
             "keep_source_dir": True,
             "archive_compress": False,
             "archive_verify": True,
+            "use_everything": True,
             "archive_layout": LAYOUT_MIRROR,
         },
         "safety": {
@@ -350,6 +351,7 @@ class Config:
     keep_source_dir: bool = True
     archive_compress: bool = False
     archive_verify: bool = True
+    use_everything: bool = True
     archive_layout: str = LAYOUT_MIRROR
     strict_verify: bool = False
     check_locks: bool = True
@@ -439,6 +441,7 @@ class Config:
             "keep_source_dir": self.keep_source_dir,
             "archive_compress": self.archive_compress,
             "archive_verify": self.archive_verify,
+            "use_everything": self.use_everything,
             "archive_layout": self.archive_layout,
         })
         raw.setdefault("safety", {})
@@ -598,6 +601,7 @@ def load_config(path: str | Path | None = None, *, create: bool = True) -> Confi
         keep_source_dir=bool(storage.get("keep_source_dir", True)),
         archive_compress=bool(storage.get("archive_compress", False)),
         archive_verify=bool(storage.get("archive_verify", True)),
+        use_everything=bool(storage.get("use_everything", True)),
         archive_layout=_archive_layout(storage.get("archive_layout")),
         strict_verify=bool(safety.get("strict_verify", False)),
         check_locks=bool(safety.get("check_locks", True)),

@@ -5,25 +5,42 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QThread, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget,
 )
 
 from ... import paths
-from ...core import windows
+from ...core import everything, windows
 from ...core.models import (
     ACTION_CLEAN, TIER_RECOMMEND, TIER_STRONG, OperationItem, human_bytes,
 )
 from .. import theme
 from ..widgets import (
-    ConfirmDialog, DriveCard, EmptyState, Gauge, GlassCard, IconButton, IconTile,
-    PageHeader, Pill, ScrollPage, StatTile, UsageBar, clear_layout, label,
+    ConfirmDialog, DriveCard, ElidedLabel, EmptyState, Gauge, GlassCard, IconButton,
+    IconTile, PageHeader, Pill, ScrollPage, StatTile, UsageBar, clear_layout, label,
 )
 from .base import (
     ACTION_ICONS, action_icon_button, card_header, fmt_size, fmt_time, ghost_button,
     note_frame, open_path, primary_button, status_pill,
 )
+
+
+class _BigFileWorker(QThread):
+    """后台查询 Everything 索引里的最大文件。"""
+
+    done = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, limit: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._limit = max(1, limit)
+
+    def run(self) -> None:
+        try:
+            self.done.emit(everything.top_files(self._limit))
+        except Exception as exc:  # noqa: BLE001
+            self.failed.emit(str(exc))
 
 
 class DashboardPage(ScrollPage):
@@ -148,6 +165,21 @@ class DashboardPage(ScrollPage):
         middle.addWidget(self.suggest_card, 2)
         self.add_layout(middle)
 
+        # 空间构成（Everything）
+        self.space_card = GlassCard(20, 10)
+        self.btn_space = ghost_button("重新扫描", "search")
+        self.btn_space.clicked.connect(self._refresh_space)
+        self.space_card.add(card_header(
+            "空间构成", "Everything 索引 · 秒级，只读", [self.btn_space]))
+        self.space_box = QVBoxLayout()
+        self.space_box.setSpacing(6)
+        self.space_card.add_layout(self.space_box)
+        self.add(self.space_card)
+        self._space_worker: _BigFileWorker | None = None
+        self._space_rows: list = []
+        self._space_auto_tried = False
+        self._render_space_hint()
+
         # 最近操作
         self.recent_card = GlassCard(20, 10)
         more = QPushButton("查看全部")
@@ -169,6 +201,10 @@ class DashboardPage(ScrollPage):
         self._update_drives()
         self._update_suggestions()
         self._update_recent()
+        if (not self._space_auto_tried and everything.available()
+                and not self._space_rows):
+            self._space_auto_tried = True
+            self._refresh_space()
 
     def _on_drives(self, _drives: list) -> None:
         self._update_hero()
@@ -178,6 +214,76 @@ class DashboardPage(ScrollPage):
         self.btn_scan.setEnabled(False)
         self.btn_hero_scan.setEnabled(False)
         self.btn_hero_scan.setText(progress.message or "正在扫描…")
+
+    # ---------- 空间构成 ----------
+
+    def _render_space_hint(self) -> None:
+        clear_layout(self.space_box)
+        if not everything.available():
+            self.btn_space.setEnabled(False)
+            self.btn_space.setText("Everything 不可用")
+            self.space_box.addWidget(EmptyState(
+                "search", "未检测到 Everything",
+                "安装并运行 Everything 后，这里可以秒级列出全盘最大的文件。"))
+            return
+        self.btn_space.setEnabled(True)
+        self.space_box.addWidget(EmptyState(
+            "search", "最大的文件",
+            "点「重新扫描」读取 Everything 索引，列出全盘最大的文件。"))
+
+    def _render_space(self) -> None:
+        clear_layout(self.space_box)
+        for row in self._space_rows[:20]:
+            line = QHBoxLayout()
+            line.setSpacing(9)
+            size = label(fmt_size(row.size), "Mono")
+            size.setFixedWidth(96)
+            size.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            path = ElidedLabel(row.path, "MonoMuted")
+            path.setToolTip(row.path)
+            open_btn = IconButton("external", "打开所在目录")
+            open_btn.clicked.connect(
+                lambda _=False, p=row.path: open_path(os.path.dirname(p)))
+            line.addWidget(size)
+            line.addWidget(path, 1)
+            line.addWidget(open_btn)
+            self.space_box.addLayout(line)
+
+    def _refresh_space(self) -> None:
+        if self._space_worker is not None and self._space_worker.isRunning():
+            return
+        if not everything.available():
+            self._render_space_hint()
+            return
+        clear_layout(self.space_box)
+        self.space_box.addWidget(label("正在查询 Everything 索引…", "Muted"))
+        self.btn_space.setEnabled(False)
+        self.btn_space.setText("扫描中…")
+        worker = _BigFileWorker(25, self)
+        worker.done.connect(self._on_space_done)
+        worker.failed.connect(self._on_space_failed)
+        self._space_worker = worker
+        worker.start()
+
+    def _on_space_done(self, rows: list) -> None:
+        self._space_rows = list(rows)
+        self._space_worker = None
+        self.btn_space.setEnabled(True)
+        self.btn_space.setText("重新扫描")
+        if not rows:
+            clear_layout(self.space_box)
+            self.space_box.addWidget(EmptyState(
+                "search", "索引里没有文件", "确认 Everything 正在运行且已建立索引。"))
+            return
+        self._render_space()
+
+    def _on_space_failed(self, error: str) -> None:
+        self._space_worker = None
+        self.btn_space.setEnabled(True)
+        self.btn_space.setText("重新扫描")
+        clear_layout(self.space_box)
+        self.space_box.addWidget(label(f"查询失败：{error}", "Muted"))
+        self.state.toast.emit(f"Everything 查询失败：{error}", "error")
 
     def _on_busy(self, busy: bool) -> None:
         if not busy and not self.state.scanning:

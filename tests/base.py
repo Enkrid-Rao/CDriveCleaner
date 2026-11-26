@@ -82,3 +82,5 @@ def set_link_readonly(path: str) -> bool:
             handle, 0, ctypes.byref(info), ctypes.sizeof(info)))
     finally:
         kernel32.CloseHandle(ctypes.c_void_p(handle))
+
+os.environ.setdefault("CDC_NO_EVERYTHING", "1")  # 测试固定走真实文件系统

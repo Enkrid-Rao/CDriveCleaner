@@ -106,7 +106,7 @@ CDriveCleaner v2 同时处理两件事：
 
 ### 安装版（推荐）
 
-下载 `CDriveCleaner-Setup-v2.3.7.exe`，双击安装。默认安装到当前用户目录，
+下载 `CDriveCleaner-Setup-v2.3.8.exe`，双击安装。默认安装到当前用户目录，
 无需管理员权限；也可以选择为所有用户安装。
 
 - 开始菜单 / 可选桌面快捷方式
@@ -115,13 +115,13 @@ CDriveCleaner v2 同时处理两件事：
 
 ### 便携版
 
-下载 `CDriveCleaner-Portable-v2.3.7.zip`，**解压整个文件夹**后双击
+下载 `CDriveCleaner-Portable-v2.3.8.zip`，**解压整个文件夹**后双击
 `CDriveCleaner.exe`。目录中的 `portable.flag` 会让程序把配置和日志写在
 `data\` 子目录，整个文件夹可以放在 U 盘或移动硬盘里。
 
 > 便携版不要只复制 exe，`_internal` 目录必须一起保留。
 
-发布校验信息与安装/卸载验证见 [docs/RELEASE-v2.3.7.md](docs/RELEASE-v2.3.7.md)。
+发布校验信息与安装/卸载验证见 [docs/RELEASE-v2.3.8.md](docs/RELEASE-v2.3.8.md)。
 
 ### 系统要求
 
@@ -239,8 +239,8 @@ python -m PyInstaller --noconfirm --clean packaging\CDriveCleaner.spec
 
 ```
 dist/CDriveCleaner/CDriveCleaner.exe
-dist/CDriveCleaner-Portable-v2.3.7.zip
-dist/CDriveCleaner-Setup-v2.3.7.exe
+dist/CDriveCleaner-Portable-v2.3.8.zip
+dist/CDriveCleaner-Setup-v2.3.8.exe
 ```
 
 ## 项目结构

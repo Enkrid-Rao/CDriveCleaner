@@ -96,6 +96,11 @@ class SettingsPage(ScrollPage):
             "默认校验副本",
             "关闭后确认归档窗口默认不勾选「归档后校验」；不校验会明显加快，但不会逐文件比对。",
             self.archive_verify))
+        self.use_everything = Toggle(self.state.config.use_everything)
+        archive.add(FormRow(
+            "用 Everything 加速分析",
+            "检测到 Everything 时，用它已建好的索引统计文件数与体积；失败会自动回退到逐文件遍历。",
+            self.use_everything))
         self.archive_compress = Toggle(self.state.config.archive_compress)
         archive.add(FormRow(
             "默认压缩归档",
@@ -248,6 +253,7 @@ class SettingsPage(ScrollPage):
         self.keep_source_dir.setChecked(cfg.keep_source_dir)
         self.archive_compress.setChecked(cfg.archive_compress)
         self.archive_verify.setChecked(cfg.archive_verify)
+        self.use_everything.setChecked(cfg.use_everything)
         self.archive_layout.set_value(cfg.archive_layout)
         self.strict_verify.setChecked(cfg.strict_verify)
         self.check_locks.setChecked(cfg.check_locks)
@@ -287,6 +293,7 @@ class SettingsPage(ScrollPage):
         cfg.keep_source_dir = self.keep_source_dir.isChecked()
         cfg.archive_compress = self.archive_compress.isChecked()
         cfg.archive_verify = self.archive_verify.isChecked()
+        cfg.use_everything = self.use_everything.isChecked()
         cfg.archive_layout = self.archive_layout.value()
         cfg.strict_verify = self.strict_verify.isChecked()
         cfg.check_locks = self.check_locks.isChecked()

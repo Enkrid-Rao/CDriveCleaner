@@ -101,6 +101,22 @@ class UISmokeTests(unittest.TestCase):
         finally:
             dialog.close()
 
+    def test_dashboard_has_space_card(self):
+        """总览页要有「空间构成（Everything）」卡片，未安装时给提示而不是报错。"""
+        state = AppState()
+        window = MainWindow(state)
+        window.show()
+        self.app.processEvents()
+        try:
+            page = window.pages["dashboard"]
+            self.assertTrue(hasattr(page, "space_card"))
+            self.assertTrue(hasattr(page, "btn_space"))
+            self.assertFalse(page.btn_space.isEnabled())
+            self.assertEqual(page.btn_space.text(), "Everything 不可用")
+        finally:
+            window.close()
+            state.shutdown()
+
     def test_dir_picker_lists_hidden_and_junction_dirs(self):
         """回归：选择器进入 Junction / 隐藏目录时必须能列出子目录。"""
         tree_root, _extra = base.temp_tree("picker")
