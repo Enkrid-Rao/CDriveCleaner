@@ -16,7 +16,7 @@ from ..core.config import Config, load_config
 from ..core.models import (
     ACTION_ARCHIVE, ACTION_CLEAN, ACTION_MIGRATE, ACTION_RESTORE, ACTION_UNDO,
     ACTION_UNLINK, MODE_LINK, MODE_MOVE, AnalysisResult, OperationItem,
-    OperationResult, Progress, ScanResult,
+    OperationResult, Progress, ScanResult, human_bytes,
 )
 from ..core.operations import AuditLog, OperationContext, run_batch
 from ..version import __version__
@@ -510,6 +510,13 @@ class AppState(QObject):
             applog.log("INFO" if result.ok else "ERROR",
                        f"{result.action} {result.name}: "
                        f"{'OK' if result.ok else result.error[:200]}")
+            if result.ok and result.action == ACTION_CLEAN:
+                if result.bytes_total > 0:
+                    self.toast.emit(
+                        f"清理完成：释放 {human_bytes(result.bytes_total)}", "success")
+                else:
+                    self.toast.emit(
+                        "没有可清理的文件（都还在保留期内，可用「全部清理」）", "warn")
         if successes and any(r.action in (ACTION_MIGRATE, ACTION_UNDO, ACTION_CLEAN,
                                           ACTION_UNLINK) for r in successes):
             QTimer.singleShot(900, self.start_scan)

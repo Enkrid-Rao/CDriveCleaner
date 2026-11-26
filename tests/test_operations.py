@@ -5,7 +5,7 @@ import unittest
 from unittest import mock
 
 from tests import base
-from cdc.core import windows
+from cdc.core import safety, windows
 from cdc.core.config import load_config
 from cdc.core.models import MODE_COPY, MODE_LINK, MODE_MOVE, OperationItem
 from cdc.core.operations import (
@@ -128,6 +128,39 @@ class OperationTests(unittest.TestCase):
         self.assertTrue((dst / "a.mp4").exists())
         self.assertTrue((dst / "sub" / "b.mp4").exists())
         self.assertFalse(target.exists())
+
+    def test_restore_by_inferred_source(self):
+        """归档后用来源标记反推原路径，再复原，数据应完整回来。"""
+        src = self._source("infer_restore")
+        dst = self.e / "archive_infer"
+        result = archive_item(OperationItem(
+            action="archive", source=str(src), dest=str(dst), name="infer_restore",
+            mode=MODE_MOVE, size_bytes=windows.directory_size(str(src))), self.ctx)
+        self.assertTrue(result.ok, result.error)
+
+        inferred, why = safety.infer_archive_source(str(dst), self.cfg)
+        self.assertEqual(os.path.normcase(inferred), os.path.normcase(str(src)), why)
+        restore = OperationItem(action="restore", source=inferred, dest=str(dst),
+                                name="infer_restore")
+        result2 = restore_archive(restore, self.ctx)
+        self.assertTrue(result2.ok, result2.error)
+        self.assertTrue((src / "a.txt").exists())
+        self.assertFalse(dst.exists())
+
+    def test_verify_phase_reports_progress(self):
+        """校验阶段必须发进度，否则界面会停在 69% 等十分钟。"""
+        seen = []
+        ctx = OperationContext(config=self.cfg, audit=self.audit,
+                               drives=self.drives, progress=seen.append)
+        src = self._source("verify_progress")
+        dst = self.e / "archive_verify"
+        result = archive_item(OperationItem(
+            action="archive", source=str(src), dest=str(dst), name="verify_progress",
+            mode=MODE_MOVE, size_bytes=windows.directory_size(str(src))), ctx)
+        self.assertTrue(result.ok, result.error)
+        verify_events = [p for p in seen if p.phase == "校验副本"]
+        self.assertTrue(verify_events, [p.phase for p in seen])
+        self.assertTrue(any(p.bytes_done > 0 for p in verify_events))
 
     def test_archive_copy_keeps_source(self):
         src = self._source("copy_src")

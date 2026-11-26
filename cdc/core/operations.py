@@ -177,6 +177,8 @@ def verify_manifest(manifest: Manifest, dest: str, *,
         total += size
         rel = os.path.relpath(path, dest)
         expected = manifest.entries.get(rel)
+        if on_progress and (checked % 128 == 0):
+            on_progress(checked, total)
         if expected is not None:
             if int(expected[0]) != size:
                 problems.append(f"大小不一致：{rel}（源 {expected[0]} / 目标 {size}）")
@@ -190,6 +192,8 @@ def verify_manifest(manifest: Manifest, dest: str, *,
                     problems.append(f"哈希不一致：{rel}")
                     if len(problems) >= 12:
                         break
+    if on_progress:
+        on_progress(checked, total)
     if checked != manifest.files:
         problems.append(f"文件数不一致：源 {manifest.files} / 目标 {checked}")
     if total != manifest.bytes:
@@ -253,6 +257,25 @@ def _join_errors(rows: Iterable[str]) -> str:
     text = "；".join([r for r in rows if r])
     return text[:800] if len(text) > 800 else text
 
+
+
+def _verify_progress_cb(ctx: OperationContext, manifest: Manifest, *,
+                        base_pct: float, span_pct: float,
+                        phase: str = "校验副本"):
+    """校验阶段也报进度与剩余时间，避免界面停在一个百分比上等十分钟。"""
+    started = time.time()
+
+    def cb(files_done: int, bytes_done: int) -> None:
+        elapsed = max(0.5, time.time() - started)
+        speed = bytes_done / elapsed
+        eta = (manifest.bytes - bytes_done) / speed if speed > 1 else 0.0
+        pct = base_pct + min(1.0, bytes_done / max(1, manifest.bytes)) * span_pct
+        ctx.emit(phase, pct,
+                 f"已校验 {files_done:,} / {manifest.files:,} 个文件",
+                 bytes_done=bytes_done, bytes_total=manifest.bytes,
+                 speed=speed, eta=eta)
+
+    return cb
 
 def _record(ctx: OperationContext, item: OperationItem, status: str,
             started: float, *, verified: bool, error: str = "",
@@ -467,8 +490,9 @@ def migrate_item(item: OperationItem, ctx: OperationContext,
 
     ctx.emit("校验副本", 69, "逐文件比对大小与数量…",
              item_index=item_index, item_count=item_count)
-    verified, problems = verify_manifest(manifest, dst, cancel=ctx.cancel,
-                                         strict=ctx.strict)
+    verified, problems = verify_manifest(
+        manifest, dst, cancel=ctx.cancel, strict=ctx.strict,
+        on_progress=_verify_progress_cb(ctx, manifest, base_pct=69, span_pct=20))
     if not verified:
         err = "复制校验失败，源目录未删除：" + _join_errors(problems)
         rec = _record(ctx, item, "failed", started, verified=False, error=err,
@@ -610,8 +634,9 @@ def undo_item(item: OperationItem, ctx: OperationContext,
 
     ctx.emit("校验副本", 72, "逐文件比对回迁结果…",
              item_index=item_index, item_count=item_count)
-    verified, problems = verify_manifest(manifest, src, cancel=ctx.cancel,
-                                         strict=ctx.strict)
+    verified, problems = verify_manifest(
+        manifest, src, cancel=ctx.cancel, strict=ctx.strict,
+        on_progress=_verify_progress_cb(ctx, manifest, base_pct=72, span_pct=18))
     if not verified:
         restored, _ = windows.create_junction(src, target)
         err = "回迁校验失败：" + _join_errors(problems)
@@ -719,8 +744,9 @@ def archive_item(item: OperationItem, ctx: OperationContext,
 
     ctx.emit("校验副本", 69, "逐文件比对归档副本…",
              item_index=item_index, item_count=item_count)
-    verified, problems = verify_manifest(manifest, dst, cancel=ctx.cancel,
-                                         strict=ctx.strict)
+    verified, problems = verify_manifest(
+        manifest, dst, cancel=ctx.cancel, strict=ctx.strict,
+        on_progress=_verify_progress_cb(ctx, manifest, base_pct=69, span_pct=20))
     if not verified:
         err = "归档校验失败，源目录未删除：" + _join_errors(problems)
         rec = _record(ctx, item, "failed", started, verified=False, error=err,
@@ -1006,8 +1032,9 @@ def restore_archive(item: OperationItem, ctx: OperationContext,
                 bytes_moved=manifest.bytes, files=manifest.files)
         return _result(item, ok=False, started=started, error=err,
                        bytes_moved=manifest.bytes, files=manifest.files)
-    verified, problems = verify_manifest(manifest, src, cancel=ctx.cancel,
-                                         strict=ctx.strict)
+    verified, problems = verify_manifest(
+        manifest, src, cancel=ctx.cancel, strict=ctx.strict,
+        on_progress=_verify_progress_cb(ctx, manifest, base_pct=72, span_pct=18))
     if not verified:
         err = "回迁校验失败：" + _join_errors(problems)
         rec = _record(ctx, item, "failed", started, error=err,

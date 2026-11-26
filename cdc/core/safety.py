@@ -133,6 +133,30 @@ def write_origin(dest: str, source: str, *, action: str, mode: str,
     windows.set_file_hidden(os.path.join(dest, MARKER_NAME))
 
 
+def infer_archive_source(path: str, config: Any = None) -> tuple[str, str]:
+    """从归档目录反推原始路径。返回 (源路径, 判断依据)；失败返回 ("", 原因)。
+
+    优先读 ``.cdc-origin.json``（任何归档结构都适用）；没有标记时，
+    按「保留原路径」的 ``<归档根>\\<盘符>\\<原路径尾部>`` 结构推断。
+    """
+    path = os.path.abspath(path)
+    origin = read_origin(path)
+    source = str(origin.get("source") or "").strip()
+    if source and os.path.isabs(source):
+        return os.path.abspath(source), f"来源标记（{origin.get('mode') or 'archive'}）"
+
+    root = getattr(config, "archive_root", "") if config is not None else ""
+    if root and os.path.isdir(root):
+        root_abs = os.path.abspath(root)
+        if path.lower().startswith(root_abs.rstrip("\\").lower() + os.sep):
+            rel = os.path.relpath(path, root_abs)
+            parts = rel.split(os.sep)
+            if len(parts) >= 2 and len(parts[0]) == 1 and parts[0].isalpha():
+                tail = os.sep.join(parts[1:])
+                return f"{parts[0].upper()}:\\{tail}", "按「保留原路径」结构推断"
+    return "", "没有 .cdc-origin.json 来源标记，也无法按路径结构推断"
+
+
 def origin_conflict(dest: str, source: str) -> str:
     """目标目录被占用时返回冲突说明；空目录 / 同源续传返回空字符串。"""
     if not os.path.lexists(dest):

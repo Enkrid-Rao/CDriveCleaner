@@ -1311,6 +1311,8 @@ class ProgressOverlay(QWidget):
         eta = float(getattr(progress, "eta_s", 0) or 0)
         if eta > 0:
             self.eta_label.setText(f"剩余 {human_duration(eta)}")
+        else:
+            self.eta_label.setText("剩余 —")
         self.detail.set_full_text(getattr(progress, "detail", "") or "")
         if pct <= 0 and total <= 0:
             self.bar.setRange(0, 0)

@@ -119,6 +119,34 @@ class ArchiveModeTests(unittest.TestCase):
                                           self.cfg, windows.list_drives())
         self.assertTrue(result.ok, result.errors)
 
+    def test_infer_archive_source_from_marker(self):
+        archive = self.e / "store" / "C" / "Users" / "someone" / "Downloads"
+        archive.mkdir(parents=True)
+        (archive / "a.bin").write_bytes(b"x")
+        source = self.d / "Downloads"
+        source.mkdir()
+        safety.write_origin(str(archive), str(source), action="archive",
+                            mode="move", op_id="x", size_bytes=1)
+        inferred, why = safety.infer_archive_source(str(archive), self.cfg)
+        self.assertEqual(os.path.normcase(inferred), os.path.normcase(str(source)))
+        self.assertIn("来源标记", why)
+
+    def test_infer_archive_source_from_mirror_layout(self):
+        self.cfg.archive_root = str(self.e / "store2")
+        archive = self.e / "store2" / "C" / "Users" / "someone" / "Downloads"
+        archive.mkdir(parents=True)
+        inferred, why = safety.infer_archive_source(str(archive), self.cfg)
+        self.assertEqual(os.path.normcase(inferred),
+                         os.path.normcase(r"C:\Users\someone\Downloads"))
+        self.assertIn("保留原路径", why)
+
+    def test_infer_archive_source_rejects_unknown(self):
+        plain = self.d / "no_marker"
+        plain.mkdir()
+        inferred, why = safety.infer_archive_source(str(plain), self.cfg)
+        self.assertEqual(inferred, "")
+        self.assertTrue(why)
+
     def test_preflight_blocks_when_junction_is_locked(self):
         """移动归档要删链接，被占用时预检就该拦住，而不是复制完几个 GB 才失败。"""
         target = self.d / "locked_target"

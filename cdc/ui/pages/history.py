@@ -13,12 +13,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from ...core import applog, windows
+from ...core import applog, safety, windows
 from ...core.models import (
     ACTION_ARCHIVE, ACTION_LINK, ACTION_MIGRATE, ACTION_RESTORE, ACTION_UNDO,
     ACTION_UNLINK, MODE_COPY, OperationItem, OperationRecord, human_bytes,
 )
 from .. import theme
+from ..dir_picker import DirPickerDialog
 from ..widgets import (
     ConfirmDialog, ElidedLabel, EmptyState, GlassCard, IconButton, IconTile,
     InfoDialog, PageHeader, Pill, SearchField, ScrollPage, StatTile,
@@ -159,10 +160,12 @@ class HistoryPage(ScrollPage):
         self.btn_export.clicked.connect(self._export)
         self.btn_refresh = ghost_button("刷新", "refresh")
         self.btn_refresh.clicked.connect(self.refresh)
+        self.btn_restore = ghost_button("从归档目录复原", "download")
+        self.btn_restore.clicked.connect(self._restore_from_archive)
         self.add(PageHeader(
             "操作记录",
             "每一次迁移、归档、撤销与清理都有可追溯的审计记录。",
-            [self.btn_export, self.btn_refresh],
+            [self.btn_restore, self.btn_export, self.btn_refresh],
         ))
         stats = QHBoxLayout()
         stats.setSpacing(12)
@@ -283,6 +286,41 @@ class HistoryPage(ScrollPage):
         self.empty.hide()
         for record in rows:
             self.rows_box.addWidget(HistoryRow(record, self))
+
+    def _restore_from_archive(self) -> None:
+        """选一个归档目录，按来源标记 / 路径结构反推原路径并回迁。"""
+        if self.state.busy:
+            self.state.toast.emit("正在执行其它操作，等它结束再复原", "warn")
+            return
+        start = self.state.config.archive_root or "E:\\"
+        dialog = DirPickerDialog(self.window(), start, title="选择要复原的归档目录")
+        if not dialog.exec():
+            return
+        if len(dialog.picked) != 1:
+            self.state.toast.emit("一次只能复原一个目录", "warn")
+            return
+        path = dialog.picked[0]
+        source, reason = safety.infer_archive_source(path, self.state.config)
+        if not source:
+            ConfirmDialog.show_info(
+                self.window(), "无法复原",
+                f"「{path}」无法反推原始路径。",
+                reason, icon_name="alert", tone="rose")
+            return
+        ok = ConfirmDialog.ask(
+            self.window(), "复原归档数据？",
+            f"把 {path} 复制回 {source}，校验通过后删除归档副本。",
+            "开始复原", tone="brand", icon_name="download",
+            details=(f"归档：{path}\n原路径：{source}\n判断依据：{reason}\n"
+                     "原路径已有数据时不会覆盖。"),
+            note="复原需要原盘有足够空间，校验通过后才会删除归档副本。",
+        )
+        if not ok:
+            return
+        item = OperationItem(action=ACTION_RESTORE, source=source, dest=path,
+                             name=os.path.basename(path.rstrip("\\/")) or path)
+        if not self.state.start_operation([item]):
+            self.state.toast.emit("有操作正在进行，等它结束再试", "warn")
 
     def _export(self) -> None:
         if not self._all:

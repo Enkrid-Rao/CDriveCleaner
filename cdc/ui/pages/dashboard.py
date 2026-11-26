@@ -294,6 +294,10 @@ class DashboardPage(ScrollPage):
                     "trash", "清理临时文件",
                     f"Temp 当前占用 {human_bytes(scan.temp_bytes)}，清理后立即释放。",
                     "立即清理", self._clean_temp))
+                rows.append((
+                    "trash", "清理全部临时文件",
+                    "包括最近生成的文件；正在被占用的会自动跳过。",
+                    "全部清理", lambda: self._clean_temp(True)))
         recommended = [c for c in analysis.candidates
                        if c.tier in (TIER_STRONG, TIER_RECOMMEND)]
         if recommended:
@@ -336,20 +340,31 @@ class DashboardPage(ScrollPage):
             layout.addWidget(btn)
             self.suggest_box.addWidget(row)
 
-    def _clean_temp(self) -> None:
-        days = self.state.config.temp_retention_days
+    def _clean_temp(self, everything: bool = False) -> None:
+        if self.state.busy:
+            self.state.toast.emit("正在执行其它操作，等它结束再清理", "warn")
+            return
+        days = 0 if everything else self.state.config.temp_retention_days
+        if everything:
+            scope = "全部临时文件（正在被使用的会自动跳过）"
+        else:
+            scope = f"超过 {days} 天的临时文件"
         ok = ConfirmDialog.ask(
             self.window(), "清理临时文件",
-            f"将删除 %TEMP% 中超过 {days} 天的文件，正在被使用的文件会自动跳过。",
+            f"将删除 %TEMP% 中{scope}。",
             "开始清理", tone="amber", icon_name="trash",
-            details=f"临时目录：{os.environ.get('TEMP', '')}\n不会删除最近 {days} 天内的文件。",
+            details=(f"临时目录：{os.environ.get('TEMP', '')}\n"
+                     f"当前占用：{human_bytes(self.state.scan.temp_bytes)}\n"
+                     "正在被占用的文件会被跳过。"),
             note="清理不可撤销，但临时文件通常可重新生成。",
         )
         if not ok:
             return
         item = OperationItem(action=ACTION_CLEAN, source=os.environ.get("TEMP", ""),
-                             name="Temp 清理", extra={"clean": "temp"})
-        self.state.start_operation([item])
+                             name="Temp 清理",
+                             extra={"clean": "temp", "retention_days": days})
+        if not self.state.start_operation([item]):
+            self.state.toast.emit("有操作正在进行，等它结束再试", "warn")
 
     # ---------- 最近操作 ----------
 

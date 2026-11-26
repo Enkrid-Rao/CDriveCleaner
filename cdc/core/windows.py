@@ -1073,6 +1073,7 @@ def robocopy_copy(
 
     last_poll = 0.0
     last_done = 0
+    samples: list[tuple[float, int]] = []
     try:
         while proc.poll() is None:
             if cancel and cancel():
@@ -1087,9 +1088,17 @@ def robocopy_copy(
                 except Exception:
                     done = last_done
                 last_done = done
-                # 用复制全程平均速度，避免轮询间隙造成几 KB/s 的假象
-                elapsed = max(0.5, now - started)
-                speed = max(0.0, done / elapsed)
+                # 用最近 15 秒的增量算速度：目标目录里如果有上一次的旧副本，
+                # 「累计完成量 / 全程耗时」会把速度算得虚高，ETA 就会显示成 1 秒。
+                samples.append((now, done))
+                while len(samples) > 2 and now - samples[0][0] > 15:
+                    samples.pop(0)
+                speed = 0.0
+                if len(samples) >= 2:
+                    t0, d0 = samples[0]
+                    span = now - t0
+                    if span > 0.5:
+                        speed = max(0.0, (done - d0) / span)
                 on_progress(done, total_bytes, speed)
             time.sleep(0.35)
         result.code = proc.wait()
