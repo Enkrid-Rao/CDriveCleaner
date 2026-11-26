@@ -129,6 +129,64 @@ class OperationTests(unittest.TestCase):
         self.assertTrue((dst / "sub" / "b.mp4").exists())
         self.assertFalse(target.exists())
 
+    def test_archive_can_skip_verify(self):
+        """关闭校验：完成后标记为未校验，且不再出现校验阶段进度。"""
+        seen = []
+        ctx = OperationContext(config=self.cfg, audit=self.audit,
+                               drives=self.drives, progress=seen.append)
+        src = self._source("skip_verify")
+        dst = self.e / "archive_skip_verify"
+        item = OperationItem(
+            action="archive", source=str(src), dest=str(dst), name="skip_verify",
+            mode=MODE_MOVE, size_bytes=windows.directory_size(str(src)),
+            extra={"skip_verify": True})
+        result = archive_item(item, ctx)
+        self.assertTrue(result.ok, result.error)
+        self.assertFalse(result.verified)
+        self.assertFalse([p for p in seen if p.phase == "校验副本"])
+        self.assertFalse((src / "a.txt").exists())
+
+    def test_archive_option_deletes_source_dir(self):
+        """勾选「删除原目录」时连目录本身一起删掉。"""
+        src = self._source("delete_dir")
+        dst = self.e / "archive_delete_dir"
+        item = OperationItem(
+            action="archive", source=str(src), dest=str(dst), name="delete_dir",
+            mode=MODE_MOVE, size_bytes=windows.directory_size(str(src)),
+            extra={"keep_source_dir": False})
+        result = archive_item(item, self.ctx)
+        self.assertTrue(result.ok, result.error)
+        self.assertFalse(src.exists())
+
+    def test_zip_archive_and_restore(self):
+        """压缩归档：生成 zip、清空源目录；复原时解压回原路径并删归档。"""
+        src = self._source("zip_src")
+        dst = self.e / "zip_archive"
+        item = OperationItem(action="archive", source=str(src), dest=str(dst),
+                             name="zip_src", mode=MODE_MOVE,
+                             size_bytes=windows.directory_size(str(src)),
+                             extra={"compress": True})
+        result = archive_item(item, self.ctx)
+        self.assertTrue(result.ok, result.error)
+        zips = list(dst.glob("*.zip"))
+        self.assertEqual(len(zips), 1)
+        self.assertFalse((src / "a.txt").exists())
+        self.assertTrue(src.is_dir())
+        origin = safety.read_origin(str(dst))
+        self.assertEqual(origin.get("format"), "zip")
+        self.assertEqual(origin.get("zip"), zips[0].name)
+        self.assertEqual(origin.get("files"), 2)
+
+        inferred, why = safety.infer_archive_source(str(dst), self.cfg)
+        self.assertEqual(os.path.normcase(inferred), os.path.normcase(str(src)), why)
+        restore = OperationItem(action="restore", source=inferred, dest=str(dst),
+                                name="zip_src")
+        result2 = restore_archive(restore, self.ctx)
+        self.assertTrue(result2.ok, result2.error)
+        self.assertTrue((src / "a.txt").exists())
+        self.assertTrue((src / "sub" / "b.bin").exists())
+        self.assertFalse(dst.exists())
+
     def test_restore_by_inferred_source(self):
         """归档后用来源标记反推原路径，再复原，数据应完整回来。"""
         src = self._source("infer_restore")

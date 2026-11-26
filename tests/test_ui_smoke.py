@@ -75,6 +75,32 @@ class UISmokeTests(unittest.TestCase):
         finally:
             theme.apply_app_theme(self.app)
 
+    def test_confirm_dialog_supports_multiple_options(self):
+        """归档确认框要能同时提供「压缩 / 校验 / 删除原目录」三个勾选项。"""
+        from cdc.ui.widgets import ConfirmDialog
+        dialog = ConfirmDialog(None, "归档 1 个目录？", "移动归档",
+                               options=["压缩成 zip", "归档后校验", "删除原目录"],
+                               options_checked=[True, False, True])
+        try:
+            self.assertEqual(len(dialog.option_checks), 3)
+            self.assertEqual([c.isChecked() for c in dialog.option_checks],
+                             [True, False, True])
+        finally:
+            dialog.close()
+
+    def test_confirm_dialog_has_optional_checkbox(self):
+        """归档确认框要能带一个额外勾选项（例如「压缩成 zip」）。"""
+        from cdc.ui.widgets import ConfirmDialog
+        dialog = ConfirmDialog(None, "标题", "消息", "确认",
+                               option="压缩成 zip 后归档", option_checked=True)
+        try:
+            self.assertIsNotNone(dialog.option_check)
+            self.assertTrue(dialog.option_check.isChecked())
+            dialog.option_check.setChecked(False)
+            self.assertFalse(dialog.option_check.isChecked())
+        finally:
+            dialog.close()
+
     def test_dir_picker_lists_hidden_and_junction_dirs(self):
         """回归：选择器进入 Junction / 隐藏目录时必须能列出子目录。"""
         tree_root, _extra = base.temp_tree("picker")

@@ -1336,7 +1336,10 @@ class ConfirmDialog(QDialog):
                  confirm_text: str = "确认", tone: str = "brand",
                  details: str = "", note: str = "", note_tone: str = "warn",
                  require_check: bool = False, icon_name: str = "alert",
-                 cancel_text: str = "取消") -> None:
+                 cancel_text: str = "取消", option: str = "",
+                 option_checked: bool = False,
+                 options: list[str] | None = None,
+                 options_checked: list[bool] | None = None) -> None:
         super().__init__(parent)
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
@@ -1403,6 +1406,17 @@ class ConfirmDialog(QDialog):
             note_layout.addWidget(note_label, 1)
             layout.addWidget(note_frame)
 
+        self.option_checks: list[Check] = []
+        labels = ([option] if option else []) + list(options or [])
+        states = ([bool(option_checked)] if option else []) + list(options_checked or [])
+        for i, text_ in enumerate(labels):
+            check = Check(text_)
+            check.setChecked(bool(states[i]) if i < len(states) else False)
+            layout.addWidget(check)
+            self.option_checks.append(check)
+        self.option_check: Check | None = (
+            self.option_checks[0] if self.option_checks else None)
+
         self.check: Check | None = None
         if require_check:
             self.check = Check("我已了解上述风险，确认继续")
@@ -1459,6 +1473,30 @@ class ConfirmDialog(QDialog):
             confirm_text: str = "确认", **kwargs: Any) -> bool:
         dialog = cls(parent, title, message, confirm_text, **kwargs)
         return dialog.exec() == QDialog.Accepted
+
+    @classmethod
+    def ask_with_option(cls, parent: QWidget | None, title: str, message: str,
+                        confirm_text: str = "确认", *, option: str = "",
+                        option_checked: bool = False,
+                        **kwargs: Any) -> tuple[bool, bool]:
+        """确认框 + 一个可选勾选项；返回 (是否确认, 勾选状态)。"""
+        dialog = cls(parent, title, message, confirm_text, option=option,
+                     option_checked=option_checked, **kwargs)
+        accepted = dialog.exec() == QDialog.Accepted
+        checked = bool(dialog.option_check and dialog.option_check.isChecked())
+        return accepted, checked
+
+    @classmethod
+    def ask_with_options(cls, parent: QWidget | None, title: str, message: str,
+                         confirm_text: str = "确认", *,
+                         options: list[str] | None = None,
+                         options_checked: list[bool] | None = None,
+                         **kwargs: Any) -> tuple[bool, list[bool]]:
+        """确认框 + 多个可选勾选项；返回 (是否确认, 各勾选状态)。"""
+        dialog = cls(parent, title, message, confirm_text, options=options,
+                     options_checked=options_checked, **kwargs)
+        accepted = dialog.exec() == QDialog.Accepted
+        return accepted, [check.isChecked() for check in dialog.option_checks]
 
     @classmethod
     def show_info(cls, parent: QWidget | None, title: str, message: str,

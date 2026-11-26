@@ -15,6 +15,7 @@ import os
 import shutil
 import time
 import uuid
+import zipfile
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable
 
@@ -399,12 +400,163 @@ def _copy_with_progress(src: str, dst: str, manifest: Manifest,
 
 
 def _write_marker(dst: str, src: str, item: OperationItem, op_id: str,
-                  size: int) -> None:
+                  size: int, *, extra: dict[str, Any] | None = None) -> None:
     try:
         safety.write_origin(dst, src, action=item.action, mode=item.mode,
-                            op_id=op_id, size_bytes=size)
+                            op_id=op_id, size_bytes=size, extra=extra)
     except OSError:
         pass
+
+
+class _ArchiveCanceled(Exception):
+    """压缩过程中用户取消。"""
+
+
+def _archive_zip(item: OperationItem, ctx: OperationContext, *,
+                 item_index: int, item_count: int) -> OperationResult:
+    """压缩归档：目录压成 <名称>.zip 放到归档目标，校验通过后清空源目录。
+
+    适合「大量小文件、以后基本不再访问」的目录：写入变成单文件顺序 IO，
+    在 USB 机械盘上通常比逐文件复制快好几倍。
+    """
+    started = time.time()
+    src = os.path.abspath(item.source)
+    dst = os.path.abspath(item.dest)
+    mode = item.mode or MODE_MOVE
+    if mode != MODE_MOVE:
+        err = "压缩归档只支持「移动归档」"
+        rec = _record(ctx, item, "failed", started, error=err)
+        return _result(item, ok=False, started=started, error=err, record_id=rec)
+    if windows.is_link(src):
+        err = "压缩归档暂不支持 Junction 源目录"
+        rec = _record(ctx, item, "failed", started, error=err)
+        return _result(item, ok=False, started=started, error=err, record_id=rec)
+
+    ctx.emit("生成清单", 3, "扫描源目录，生成压缩清单…",
+             item_index=item_index, item_count=item_count)
+    manifest = build_manifest(src, cancel=ctx.cancel, strict=False)
+    if ctx.canceled:
+        rec = _record(ctx, item, "canceled", started, verified=False, error="用户取消")
+        return _result(item, ok=False, started=started, error="用户已取消", record_id=rec)
+    if manifest.files == 0:
+        err = "源目录为空，未执行压缩归档"
+        rec = _record(ctx, item, "failed", started, verified=False, error=err)
+        return _result(item, ok=False, started=started, error=err, record_id=rec)
+
+    op_id = ctx.job_id or _new_id("arc")
+    ctx.job_id = op_id
+    try:
+        os.makedirs(dst, exist_ok=True)
+    except OSError as exc:
+        err = f"无法创建归档目录：{exc}"
+        rec = _record(ctx, item, "failed", started, verified=False, error=err)
+        return _result(item, ok=False, started=started, error=err, record_id=rec)
+
+    name = os.path.basename(src.rstrip("\\/")) or "archive"
+    zip_path = os.path.join(dst, f"{name}.zip")
+    part = zip_path + ".part"
+    total = manifest.bytes or 1
+    done = 0
+    files = 0
+    mark = time.time()
+    try:
+        with zipfile.ZipFile(part, "w", zipfile.ZIP_DEFLATED,
+                             compresslevel=1, allowZip64=True) as archive:
+            for path, size, _mtime in windows.iter_files(src, cancel=ctx.cancel):
+                if ctx.canceled:
+                    raise _ArchiveCanceled()
+                if _is_marker_file(path, src):
+                    continue
+                arcname = os.path.relpath(path, src).replace("\\", "/")
+                archive.write(path, arcname)
+                files += 1
+                done += size
+                now = time.time()
+                if files % 64 == 0 or now - mark >= 2.0:
+                    mark = now
+                    elapsed = max(0.5, now - started)
+                    speed = done / elapsed
+                    eta = (manifest.bytes - done) / speed if speed > 1 else 0.0
+                    pct = 5 + min(1.0, done / total) * 65
+                    ctx.emit("压缩", pct,
+                             f"已压缩 {human_bytes(done)} / {human_bytes(manifest.bytes)}",
+                             bytes_done=done, bytes_total=manifest.bytes,
+                             speed=speed, eta=eta,
+                             item_index=item_index, item_count=item_count)
+    except _ArchiveCanceled:
+        part.unlink(missing_ok=True)
+        rec = _record(ctx, item, "canceled", started, verified=False, error="用户取消")
+        return _result(item, ok=False, started=started, error="用户已取消", record_id=rec)
+    except Exception as exc:  # noqa: BLE001
+        part.unlink(missing_ok=True)
+        err = f"压缩失败：{exc}"
+        rec = _record(ctx, item, "failed", started, verified=False, error=err)
+        return _result(item, ok=False, started=started, error=err, record_id=rec)
+    os.replace(part, zip_path)
+
+    ctx.emit("校验压缩包", 72, "检查压缩包的条目数与大小…",
+             item_index=item_index, item_count=item_count)
+    try:
+        with zipfile.ZipFile(zip_path) as archive:
+            infos = [info for info in archive.infolist() if not info.is_dir()]
+            entries = len(infos)
+            restored_bytes = sum(int(info.file_size) for info in infos)
+            strict_check = ctx.strict and not bool(item.extra.get("skip_verify"))
+            bad = archive.testzip() if strict_check else None
+    except (OSError, zipfile.BadZipFile) as exc:
+        err = f"压缩包无法读取：{exc}"
+        rec = _record(ctx, item, "failed", started, verified=False, error=err)
+        return _result(item, ok=False, started=started, error=err, record_id=rec)
+    if entries != manifest.files or restored_bytes != manifest.bytes or bad:
+        err = (f"压缩包校验失败：条目 {entries}/{manifest.files}，"
+               f"大小 {restored_bytes}/{manifest.bytes}"
+               + (f"，损坏条目 {bad}" if bad else ""))
+        rec = _record(ctx, item, "failed", started, verified=True, error=err)
+        return _result(item, ok=False, started=started, error=err, record_id=rec)
+
+    _write_marker(dst, src, item, op_id, manifest.bytes,
+                  extra={"format": "zip", "zip": os.path.basename(zip_path),
+                         "files": entries, "bytes": restored_bytes})
+
+    keep_src = bool(item.extra.get(
+        "keep_source_dir", getattr(ctx.config, "keep_source_dir", True)))
+    ctx.emit("清空源目录", 82,
+             "压缩包已校验，正在清空源目录（保留目录骨架）…" if keep_src
+             else "压缩包已校验，正在删除源目录…",
+             item_index=item_index, item_count=item_count)
+
+    def del_progress(count: int, size: int) -> None:
+        ctx.emit("清空源目录", 82 + min(10, count / 5000 * 10),
+                 f"已清理 {count:,} 个文件…", bytes_done=size,
+                 bytes_total=manifest.bytes, item_index=item_index,
+                 item_count=item_count)
+
+    if keep_src:
+        delete = windows.clear_tree_keep_structure(src, cancel=None, on_progress=del_progress)
+        stage, err_head = "clear", "压缩包已生成并校验，但源目录未完全清空"
+    else:
+        delete = windows.safe_delete_tree(src, cancel=None, on_progress=del_progress)
+        stage, err_head = "delete", "压缩包已生成并校验，但源目录删除不完整"
+    if not delete.ok:
+        err = f"{err_head}：" + _join_errors(delete.errors)
+        rec = _record(ctx, item, "failed", started, verified=True, error=err,
+                      bytes_moved=manifest.bytes, files=manifest.files,
+                      extra={"stage": stage, "dest": dst, "zip": zip_path})
+        return _result(item, ok=False, started=started, error=err,
+                       warnings=[], verified=True,
+                       bytes_moved=manifest.bytes, files=manifest.files,
+                       record_id=rec, extra={"dest": dst})
+
+    ctx.emit("完成", 100, f"压缩归档完成：{os.path.basename(zip_path)}",
+             bytes_done=manifest.bytes, bytes_total=manifest.bytes,
+             item_index=item_index, item_count=item_count)
+    rec = _record(ctx, item, "success", started, verified=True,
+                  bytes_moved=manifest.bytes, files=manifest.files,
+                  extra={"dest": dst, "zip": zip_path, "format": "zip",
+                         "mode": mode, "keep_source_dir": keep_src})
+    return _result(item, ok=True, started=started, verified=True,
+                   bytes_moved=manifest.bytes, files=manifest.files,
+                   record_id=rec, extra={"dest": dst, "zip": zip_path})
 
 
 def _rollback_migration(src: str, dst: str, manifest: Manifest,
@@ -517,7 +669,7 @@ def migrate_item(item: OperationItem, ctx: OperationContext,
                           bytes_moved=manifest.bytes, files=manifest.files,
                           extra={"stage": "lock", "dest": dst, "manifest": manifest_path})
             return _result(item, ok=False, started=started, error=err,
-                           warnings=warnings, verified=True,
+                           warnings=warnings, verified=verified,
                            bytes_moved=manifest.bytes, files=manifest.files,
                            record_id=rec, extra={"dest": dst})
 
@@ -697,6 +849,11 @@ def archive_item(item: OperationItem, ctx: OperationContext,
         return _result(item, ok=False, started=started, error=err,
                        warnings=pre.warnings, record_id=rec)
 
+    skip_verify = bool(item.extra.get("skip_verify"))
+
+    if item.extra.get("compress") and (item.mode or MODE_MOVE) == MODE_MOVE:
+        return _archive_zip(item, ctx, item_index=item_index, item_count=item_count)
+
     src = os.path.abspath(item.source)
     dst = os.path.abspath(item.dest)
     mode = item.mode or MODE_MOVE
@@ -711,7 +868,8 @@ def archive_item(item: OperationItem, ctx: OperationContext,
     ctx.job_id = op_id
     ctx.emit("生成清单", 2, "扫描归档源，生成校验清单…",
              item_index=item_index, item_count=item_count)
-    manifest = build_manifest(work_src, cancel=ctx.cancel, strict=ctx.strict)
+    manifest = build_manifest(work_src, cancel=ctx.cancel,
+                              strict=ctx.strict and not skip_verify)
     if ctx.canceled:
         _record(ctx, item, "canceled", started, verified=False, error="用户取消",
                 bytes_moved=manifest.bytes, files=manifest.files)
@@ -742,31 +900,36 @@ def archive_item(item: OperationItem, ctx: OperationContext,
                        bytes_moved=manifest.bytes, files=manifest.files,
                        record_id=rec, extra={"dest": dst})
 
-    ctx.emit("校验副本", 69, "逐文件比对归档副本…",
-             item_index=item_index, item_count=item_count)
-    verified, problems = verify_manifest(
-        manifest, dst, cancel=ctx.cancel, strict=ctx.strict,
-        on_progress=_verify_progress_cb(ctx, manifest, base_pct=69, span_pct=20))
-    if not verified:
-        err = "归档校验失败，源目录未删除：" + _join_errors(problems)
-        rec = _record(ctx, item, "failed", started, verified=False, error=err,
-                      bytes_moved=manifest.bytes, files=manifest.files,
-                      extra={"stage": "verify", "dest": dst, "manifest": manifest_path})
-        return _result(item, ok=False, started=started, error=err,
-                       bytes_moved=manifest.bytes, files=manifest.files,
-                       record_id=rec, extra={"dest": dst})
-
     warnings = list(pre.warnings)
+    verified = True
+    if skip_verify:
+        verified = False
+        warnings.append("已跳过副本校验（用户选择），请自行确认归档目录可正常打开")
+    else:
+        ctx.emit("校验副本", 69, "逐文件比对归档副本…",
+                 item_index=item_index, item_count=item_count)
+        verified, problems = verify_manifest(
+            manifest, dst, cancel=ctx.cancel, strict=ctx.strict,
+            on_progress=_verify_progress_cb(ctx, manifest, base_pct=69, span_pct=20))
+        if not verified:
+            err = "归档校验失败，源目录未删除：" + _join_errors(problems)
+            rec = _record(ctx, item, "failed", started, verified=False, error=err,
+                          bytes_moved=manifest.bytes, files=manifest.files,
+                          extra={"stage": "verify", "dest": dst,
+                                 "manifest": manifest_path})
+            return _result(item, ok=False, started=started, error=err,
+                           bytes_moved=manifest.bytes, files=manifest.files,
+                           record_id=rec, extra={"dest": dst})
     if mode == MODE_COPY:
         ctx.emit("完成", 100, "仅复制完成，源目录保留",
                  item_index=item_index, item_count=item_count)
-        rec = _record(ctx, item, "success", started, verified=True,
+        rec = _record(ctx, item, "success", started, verified=verified,
                       bytes_moved=manifest.bytes, files=manifest.files,
                       extra={"dest": dst, "manifest": manifest_path, "mode": mode,
                              "junction_source": is_link_source,
                              "old_target": work_src if is_link_source else ""})
         return _result(item, ok=True, started=started, warnings=warnings,
-                       verified=True, bytes_moved=manifest.bytes,
+                       verified=verified, bytes_moved=manifest.bytes,
                        files=manifest.files, record_id=rec,
                        extra={"dest": dst, "mode": mode})
 
@@ -778,16 +941,18 @@ def archive_item(item: OperationItem, ctx: OperationContext,
                           bytes_moved=manifest.bytes, files=manifest.files,
                           extra={"stage": "lock", "dest": dst})
             return _result(item, ok=False, started=started, error=err,
-                           warnings=warnings, verified=True,
+                           warnings=warnings, verified=verified,
                            bytes_moved=manifest.bytes, files=manifest.files,
                            record_id=rec, extra={"dest": dst})
 
-    keep_src = bool(getattr(ctx.config, "keep_source_dir", True))
-    if mode == MODE_MOVE:
-        stage_text = ("副本已校验，正在清空源目录（保留目录骨架）…" if keep_src
-                      else "副本已校验，正在删除源目录…")
+    keep_src = bool(item.extra.get(
+        "keep_source_dir", getattr(ctx.config, "keep_source_dir", True)))
+    if mode == MODE_MOVE and keep_src:
+        stage_text = "正在清空源目录（保留目录骨架）…"
     else:
-        stage_text = "副本已校验，正在删除源目录…"
+        stage_text = "正在删除源目录…"
+    if not skip_verify:
+        stage_text = "副本已校验，" + stage_text
     ctx.emit("清空源目录", 82, stage_text,
              item_index=item_index, item_count=item_count)
 
@@ -816,7 +981,7 @@ def archive_item(item: OperationItem, ctx: OperationContext,
                                      "retarget_error": retarget_error,
                                      "unlink_error": unlink_error})
                 return _result(item, ok=False, started=started, error=err,
-                               warnings=warnings, verified=True,
+                               warnings=warnings, verified=verified,
                                bytes_moved=manifest.bytes, files=manifest.files,
                                record_id=rec, extra={"dest": dst})
             ok_link, link_err = windows.create_junction(src, dst)
@@ -828,7 +993,7 @@ def archive_item(item: OperationItem, ctx: OperationContext,
                               extra={"stage": "relink", "dest": dst,
                                      "old_target": work_src, "relinked": False})
                 return _result(item, ok=False, started=started, error=err,
-                               warnings=warnings, verified=True,
+                               warnings=warnings, verified=verified,
                                bytes_moved=manifest.bytes, files=manifest.files,
                                record_id=rec, extra={"dest": dst})
 
@@ -845,16 +1010,18 @@ def archive_item(item: OperationItem, ctx: OperationContext,
         # MODE_MOVE：链接和旧目标都删掉，原路径不再存在
         unlinked, unlink_error = windows.remove_link_ex(src)
         if not unlinked:
-            err = ("副本已校验，但无法移除原目录的 Junction："
-                   f"{unlink_error or '原因未知'}。"
-                   "关掉正占用该目录的程序后重试；"
-                   f"已校验的副本保留在 {dst}")
-            rec = _record(ctx, item, "failed", started, verified=True, error=err,
+            err = ("副本已校验，但无法移除原目录的 Junction：" if verified else
+                   "副本已复制（未校验），但无法移除原目录的 Junction：")
+            err += (f"{unlink_error or '原因未知'}。"
+                    "关掉正占用该目录的程序后重试；"
+                    + (f"已校验的副本保留在 {dst}" if verified
+                       else f"副本保留在 {dst}"))
+            rec = _record(ctx, item, "failed", started, verified=verified, error=err,
                           bytes_moved=manifest.bytes, files=manifest.files,
                           extra={"stage": "unlink", "dest": dst, "old_target": work_src,
                                  "unlink_error": unlink_error})
             return _result(item, ok=False, started=started, error=err,
-                           warnings=warnings, verified=True,
+                           warnings=warnings, verified=verified,
                            bytes_moved=manifest.bytes, files=manifest.files,
                            record_id=rec, extra={"dest": dst})
         ctx.emit("删除旧目标", 84, f"正在释放旧目标 {human_bytes(manifest.bytes)}…",
@@ -863,16 +1030,17 @@ def archive_item(item: OperationItem, ctx: OperationContext,
                                           on_progress=del_progress)
         if not delete.ok:
             restored_link, _ = windows.create_junction(src, work_src)
-            err = ("旧目标删除不完整；数据已校验并保存在归档目标。"
+            err = (("旧目标删除不完整；数据已校验并保存在归档目标。" if verified else
+                    "旧目标删除不完整；数据已复制（未校验）并保存在归档目标。")
                    + ("已恢复原链接。" if restored_link else
                       f"原链接未能恢复，数据完整保存在 {dst}。"))
-            rec = _record(ctx, item, "failed", started, verified=True, error=err,
+            rec = _record(ctx, item, "failed", started, verified=verified, error=err,
                           bytes_moved=manifest.bytes, files=manifest.files,
                           extra={"stage": "delete_old_target", "dest": dst,
                                  "old_target": work_src,
                                  "delete_errors": delete.errors[:20]})
             return _result(item, ok=False, started=started, error=err,
-                           warnings=warnings, verified=True,
+                           warnings=warnings, verified=verified,
                            bytes_moved=manifest.bytes, files=manifest.files,
                            record_id=rec, extra={"dest": dst})
     else:
@@ -888,29 +1056,31 @@ def archive_item(item: OperationItem, ctx: OperationContext,
                     src, cancel=None, on_progress=del_progress)
                 stage, err_head = "delete", "源目录删除不完整"
             if not delete.ok:
-                err = (f"{err_head}（数据已完整校验并保存在归档目标）："
-                       + _join_errors(delete.errors))
-                rec = _record(ctx, item, "failed", started, verified=True, error=err,
+                err = (f"{err_head}（数据" +
+                       ("已完整校验" if verified else "已复制（未校验）") +
+                       "并保存在归档目标）：" + _join_errors(delete.errors))
+                rec = _record(ctx, item, "failed", started, verified=verified, error=err,
                               bytes_moved=manifest.bytes, files=manifest.files,
                               extra={"stage": stage, "dest": dst,
                                      "manifest": manifest_path,
                                      "delete_errors": delete.errors[:20]})
                 return _result(item, ok=False, started=started, error=err,
-                               warnings=warnings, verified=True,
+                               warnings=warnings, verified=verified,
                                bytes_moved=manifest.bytes, files=manifest.files,
                                record_id=rec, extra={"dest": dst})
         else:
             delete = windows.safe_delete_tree(src, cancel=None, on_progress=del_progress)
             if not delete.ok:
-                err = ("源目录删除不完整（数据已完整校验并保存在归档目标）："
-                       + _join_errors(delete.errors))
-                rec = _record(ctx, item, "failed", started, verified=True, error=err,
+                err = ("源目录删除不完整（数据" +
+                       ("已完整校验" if verified else "已复制（未校验）") +
+                       "并保存在归档目标）：" + _join_errors(delete.errors))
+                rec = _record(ctx, item, "failed", started, verified=verified, error=err,
                               bytes_moved=manifest.bytes, files=manifest.files,
                               extra={"stage": "delete", "dest": dst,
                                      "manifest": manifest_path,
                                      "delete_errors": delete.errors[:20]})
                 return _result(item, ok=False, started=started, error=err,
-                               warnings=warnings, verified=True,
+                               warnings=warnings, verified=verified,
                                bytes_moved=manifest.bytes, files=manifest.files,
                                record_id=rec, extra={"dest": dst})
 
@@ -942,7 +1112,7 @@ def archive_item(item: OperationItem, ctx: OperationContext,
     ctx.emit("完成", 100, done_text,
              bytes_done=manifest.bytes, bytes_total=manifest.bytes,
              item_index=item_index, item_count=item_count)
-    rec = _record(ctx, item, "success", started, verified=True,
+    rec = _record(ctx, item, "success", started, verified=verified,
                   bytes_moved=manifest.bytes, files=manifest.files,
                   extra={"dest": dst, "manifest": manifest_path, "mode": mode,
                          "junction_source": is_link_source,
@@ -951,7 +1121,7 @@ def archive_item(item: OperationItem, ctx: OperationContext,
     _prune_manifests(str(paths.manifests_dir()),
                      int(ctx.config.raw.get("safety", {}).get("keep_manifests", 30) or 30))
     return _result(item, ok=True, started=started, warnings=warnings,
-                   verified=True, bytes_moved=manifest.bytes,
+                   verified=verified, bytes_moved=manifest.bytes,
                    files=manifest.files, record_id=rec,
                    extra={"dest": dst, "mode": mode,
                           "junction_source": is_link_source,
@@ -987,6 +1157,98 @@ def _rollback_archive_link(src: str, dst: str, manifest: Manifest,
 # 归档回迁
 # ============================================================
 
+def _restore_zip(item: OperationItem, ctx: OperationContext,
+                 src: str, dst: str, origin: dict[str, Any], started: float,
+                 item_index: int, item_count: int) -> OperationResult:
+    """把「压缩归档」的 zip 解压回原路径，校验通过后删除归档目录。"""
+    zip_name = str(origin.get("zip") or "")
+    zip_path = os.path.join(dst, zip_name) if zip_name else ""
+    if not zip_name or not os.path.isfile(zip_path):
+        err = "归档目录里找不到压缩包（来源标记中的 zip 字段无效）"
+        rec = _record(ctx, item, "failed", started, error=err)
+        return _result(item, ok=False, started=started, error=err, record_id=rec)
+
+    if os.path.lexists(src):
+        if windows.is_link(src):
+            unlinked, unlink_error = windows.remove_link_ex(src)
+            if not unlinked:
+                err = "无法移除原路径的链接：" + (unlink_error or "原因未知")
+                rec = _record(ctx, item, "failed", started, error=err)
+                return _result(item, ok=False, started=started, error=err, record_id=rec)
+        elif os.path.isdir(src) and \
+                windows.directory_stats(src, collect_ext=False).files == 0:
+            pass
+        else:
+            err = "原路径已存在数据，不能回迁（请先清理）"
+            rec = _record(ctx, item, "failed", started, error=err)
+            return _result(item, ok=False, started=started, error=err, record_id=rec)
+
+    try:
+        with zipfile.ZipFile(zip_path) as archive:
+            infos = [info for info in archive.infolist() if not info.is_dir()]
+            total = sum(int(info.file_size) for info in infos)
+    except (OSError, zipfile.BadZipFile) as exc:
+        err = f"压缩包无法读取：{exc}"
+        rec = _record(ctx, item, "failed", started, error=err)
+        return _result(item, ok=False, started=started, error=err, record_id=rec)
+
+    free = windows.free_bytes(os.path.dirname(src))
+    need = total + max(safety.MIN_FREE_MARGIN, int(total * 0.02))
+    if free < need:
+        err = f"原盘空间不足：需要 {human_bytes(need)}，当前 {human_bytes(free)}"
+        rec = _record(ctx, item, "failed", started, error=err)
+        return _result(item, ok=False, started=started, error=err, record_id=rec)
+
+    os.makedirs(src, exist_ok=True)
+    done = 0
+    copy_started = time.time()
+    try:
+        with zipfile.ZipFile(zip_path) as archive:
+            for info in infos:
+                if ctx.canceled:
+                    err = "用户已取消"
+                    rec = _record(ctx, item, "canceled", started, error=err)
+                    return _result(item, ok=False, started=started, error=err,
+                                   record_id=rec)
+                rel = info.filename.replace("/", os.sep)
+                target = os.path.join(src, rel)
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with archive.open(info) as reader, open(target, "wb") as writer:
+                    shutil.copyfileobj(reader, writer, 1024 * 1024)
+                done += int(info.file_size)
+                elapsed = max(0.5, time.time() - copy_started)
+                speed = done / elapsed
+                eta = (total - done) / speed if speed > 1 else 0.0
+                pct = 8 + min(1.0, done / max(1, total)) * 78
+                ctx.emit("回迁", pct,
+                         f"已解压 {human_bytes(done)} / {human_bytes(total)}",
+                         bytes_done=done, bytes_total=total, speed=speed, eta=eta,
+                         item_index=item_index, item_count=item_count)
+    except (OSError, zipfile.BadZipFile) as exc:
+        err = f"解压失败（压缩包可能损坏）：{exc}"
+        rec = _record(ctx, item, "failed", started, error=err)
+        return _result(item, ok=False, started=started, error=err, record_id=rec)
+
+    stats = windows.directory_stats(src, collect_ext=False)
+    if stats.files != len(infos) or stats.bytes != total:
+        err = (f"解压校验失败：文件 {stats.files}/{len(infos)}，"
+               f"大小 {stats.bytes}/{total}")
+        rec = _record(ctx, item, "failed", started, error=err)
+        return _result(item, ok=False, started=started, error=err, record_id=rec)
+
+    _grant_permissions(src)
+    warnings: list[str] = []
+    report = windows.safe_delete_tree(dst)
+    if not report.ok:
+        warnings.append("归档副本删除不完整：" + _join_errors(report.errors))
+    rec = _record(ctx, item, "success", started, verified=True,
+                  bytes_moved=total, files=len(infos),
+                  extra={"dest": dst, "zip": zip_path, "format": "zip"})
+    return _result(item, ok=True, started=started, verified=True,
+                   bytes_moved=total, files=len(infos), warnings=warnings,
+                   record_id=rec, extra={"dest": dst})
+
+
 def restore_archive(item: OperationItem, ctx: OperationContext,
                     item_index: int = 0, item_count: int = 1) -> OperationResult:
     """把归档目标的数据复制回原路径（移动归档的逆操作）。"""
@@ -997,6 +1259,10 @@ def restore_archive(item: OperationItem, ctx: OperationContext,
         err = f"归档数据不存在：{dst}"
         rec = _record(ctx, item, "failed", started, error=err)
         return _result(item, ok=False, started=started, error=err, record_id=rec)
+    origin = safety.read_origin(dst)
+    if str(origin.get("format") or "") == "zip":
+        return _restore_zip(item, ctx, src, dst, origin, started,
+                            item_index, item_count)
     if os.path.lexists(src):
         if windows.is_link(src):
             pass

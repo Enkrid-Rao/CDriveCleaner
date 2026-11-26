@@ -91,6 +91,16 @@ class SettingsPage(ScrollPage):
             "归档后保留原目录",
             "开启时只清空内容、保留骨架；关闭则连目录一起删除。",
             self.keep_source_dir))
+        self.archive_verify = Toggle(self.state.config.archive_verify)
+        archive.add(FormRow(
+            "默认校验副本",
+            "关闭后确认归档窗口默认不勾选「归档后校验」；不校验会明显加快，但不会逐文件比对。",
+            self.archive_verify))
+        self.archive_compress = Toggle(self.state.config.archive_compress)
+        archive.add(FormRow(
+            "默认压缩归档",
+            "开启后确认归档窗口默认勾选「压缩成 zip」；仅对移动归档生效。",
+            self.archive_compress))
         self.archive_layout = SegmentedControl(
             [(LAYOUT_MIRROR, "保留原路径"), (LAYOUT_FLAT, "按目录名")],
             self.state.config.archive_layout,
@@ -236,6 +246,8 @@ class SettingsPage(ScrollPage):
         self.archive_min.setValue(cfg.archive_min_mb)
         self.default_mode.set_value(cfg.default_mode)
         self.keep_source_dir.setChecked(cfg.keep_source_dir)
+        self.archive_compress.setChecked(cfg.archive_compress)
+        self.archive_verify.setChecked(cfg.archive_verify)
         self.archive_layout.set_value(cfg.archive_layout)
         self.strict_verify.setChecked(cfg.strict_verify)
         self.check_locks.setChecked(cfg.check_locks)
@@ -273,6 +285,8 @@ class SettingsPage(ScrollPage):
         cfg.archive_min_mb = self.archive_min.value()
         cfg.default_mode = self.default_mode.value()
         cfg.keep_source_dir = self.keep_source_dir.isChecked()
+        cfg.archive_compress = self.archive_compress.isChecked()
+        cfg.archive_verify = self.archive_verify.isChecked()
         cfg.archive_layout = self.archive_layout.value()
         cfg.strict_verify = self.strict_verify.isChecked()
         cfg.check_locks = self.check_locks.isChecked()

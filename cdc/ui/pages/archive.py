@@ -633,6 +633,54 @@ class ArchivePage(QWidget):
             self._render()
         self._update_plan()
 
+    def _compress_available(self, candidates: list[ArchiveCandidate]) -> bool:
+        """只有「移动归档」且不是 Junction 源时才允许压缩。"""
+        return self.mode.value() == MODE_MOVE and any(
+            not c.is_junction for c in candidates)
+
+    def _archive_options(self, compress_ok: bool) -> tuple[list[str], list[bool], list[str]]:
+        """确认归档弹窗里的可选项：标签 / 默认值 / key。"""
+        cfg = self.state.config
+        labels: list[str] = []
+        defaults: list[bool] = []
+        keys: list[str] = []
+        if compress_ok:
+            labels.append("压缩成 zip 后归档（适合大量小文件、以后不再访问）")
+            defaults.append(bool(getattr(cfg, "archive_compress", False)))
+            keys.append("compress")
+        labels.append("归档后校验副本（推荐；关闭可明显加快，但不会逐文件比对）")
+        defaults.append(bool(getattr(cfg, "archive_verify", True)))
+        keys.append("verify")
+        labels.append("归档后删除原目录（不保留空目录）")
+        defaults.append(not bool(getattr(cfg, "keep_source_dir", True)))
+        keys.append("delete_src")
+        return labels, defaults, keys
+
+    def _apply_archive_options(self, items: list[OperationItem],
+                               choice: dict[str, bool]) -> None:
+        compress = bool(choice.get("compress"))
+        verify = bool(choice.get("verify", True))
+        delete_src = bool(choice.get("delete_src"))
+        applied = 0
+        for item in items:
+            if not verify:
+                item.extra["skip_verify"] = True
+            item.extra["keep_source_dir"] = not delete_src
+            if compress and item.mode == MODE_MOVE and \
+                    not item.extra.get("junction_source"):
+                item.extra["compress"] = True
+                applied += 1
+        cfg = self.state.config
+        cfg.archive_verify = verify
+        cfg.keep_source_dir = not delete_src
+        if "compress" in choice:
+            cfg.archive_compress = compress
+        self._persist_options()
+        if applied:
+            self.state.toast.emit(f"将压缩 {applied} 个目录后再归档", "info")
+        if not verify:
+            self.state.toast.emit("已关闭校验：归档后不会逐文件比对，请谨慎", "warn")
+
     def _duplicate_dests(self, items: list[OperationItem]) -> list[str]:
         seen: dict[str, str] = {}
         dupes: list[str] = []
@@ -699,19 +747,25 @@ class ArchivePage(QWidget):
                           for i in items[:8])
         if len(items) > 8:
             lines += f"\n… 另有 {len(items) - 8} 个"
-        ok = ConfirmDialog.ask(
+        compress_ok = mode == MODE_MOVE and any(
+            not item.extra.get("junction_source") for item in items)
+        labels, defaults, keys = self._archive_options(compress_ok)
+        ok, values = ConfirmDialog.ask_with_options(
             self.window(),
             f"归档 {len(items)} 个目录？" if len(items) > 1 else f"归档「{items[0].name}」？",
             f"{MODE_LABELS.get(mode, '')} · 共 {human_bytes(total)} → {self._archive_root()}",
             "开始归档",
+            options=labels,
+            options_checked=defaults,
             tone="teal",
             details=lines,
-            note=note,
+            note=note + " 可用下方勾选项调整本次归档行为。",
             note_tone="warn" if mode == MODE_LINK else "success",
             require_check=True,
             icon_name="archive",
         )
         if ok:
+            self._apply_archive_options(items, dict(zip(keys, values)))
             self.state.start_operation(items)
 
     def _analyze(self) -> None:
@@ -927,15 +981,19 @@ class ArchivePage(QWidget):
         mode_text = (LINK_RETARGET_LABEL
                      if linked and len(linked) == len(candidates)
                      else MODE_LABELS.get(mode, ""))
-        ok = ConfirmDialog.ask(
+        compress_ok = self._compress_available(candidates)
+        labels, defaults, keys = self._archive_options(compress_ok)
+        ok, values = ConfirmDialog.ask_with_options(
             self.window(),
             f"归档 {len(candidates)} 个目录？" if len(candidates) > 1 else
             f"归档「{candidates[0].name}」？",
             f"{mode_text} · 共 {human_bytes(total)} → {root}",
             "开始归档",
+            options=labels,
+            options_checked=defaults,
             tone="teal",
             details=names + f"\n\n目标路径：{root}",
-            note=note,
+            note=note + " 可用下方勾选项调整本次归档行为。",
             note_tone="warn" if (drive and drive.is_usb) or mode == MODE_LINK or bool(linked)
             else "success",
             require_check=len(candidates) > 1 or mode != MODE_COPY or bool(linked),
@@ -943,5 +1001,6 @@ class ArchivePage(QWidget):
         )
         if not ok:
             return
+        self._apply_archive_options(items, dict(zip(keys, values)))
         if self.state.start_operation(items):
             self._clear_selection()

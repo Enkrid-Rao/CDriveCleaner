@@ -180,6 +180,8 @@ def _default_config() -> dict[str, Any]:
             "temp_retention_days": 1,
             "default_mode": MODE_MOVE,
             "keep_source_dir": True,
+            "archive_compress": False,
+            "archive_verify": True,
             "archive_layout": LAYOUT_MIRROR,
         },
         "safety": {
@@ -346,6 +348,8 @@ class Config:
     temp_retention_days: int = 1
     default_mode: str = MODE_MOVE
     keep_source_dir: bool = True
+    archive_compress: bool = False
+    archive_verify: bool = True
     archive_layout: str = LAYOUT_MIRROR
     strict_verify: bool = False
     check_locks: bool = True
@@ -433,6 +437,8 @@ class Config:
             "temp_retention_days": self.temp_retention_days,
             "default_mode": self.default_mode,
             "keep_source_dir": self.keep_source_dir,
+            "archive_compress": self.archive_compress,
+            "archive_verify": self.archive_verify,
             "archive_layout": self.archive_layout,
         })
         raw.setdefault("safety", {})
@@ -590,6 +596,8 @@ def load_config(path: str | Path | None = None, *, create: bool = True) -> Confi
         # 归档不再提供「链接归档」，老配置里的 link 一律归到移动归档
         default_mode=_archive_mode(storage.get("default_mode")),
         keep_source_dir=bool(storage.get("keep_source_dir", True)),
+        archive_compress=bool(storage.get("archive_compress", False)),
+        archive_verify=bool(storage.get("archive_verify", True)),
         archive_layout=_archive_layout(storage.get("archive_layout")),
         strict_verify=bool(safety.get("strict_verify", False)),
         check_locks=bool(safety.get("check_locks", True)),

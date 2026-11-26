@@ -118,7 +118,8 @@ def read_origin(dest: str) -> dict[str, Any]:
 
 
 def write_origin(dest: str, source: str, *, action: str, mode: str,
-                 op_id: str, size_bytes: int) -> None:
+                 op_id: str, size_bytes: int,
+                 extra: dict[str, Any] | None = None) -> None:
     data = {
         "schema": 1,
         "source": os.path.abspath(source),
@@ -129,6 +130,8 @@ def write_origin(dest: str, source: str, *, action: str, mode: str,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "app": "CDriveCleaner",
     }
+    if extra:
+        data.update(extra)
     windows.write_json_atomic(os.path.join(dest, MARKER_NAME), data)
     windows.set_file_hidden(os.path.join(dest, MARKER_NAME))
 
