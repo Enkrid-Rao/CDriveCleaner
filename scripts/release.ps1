@@ -116,7 +116,7 @@ $versionText = [System.IO.File]::ReadAllText($versionPy)
 $match = [regex]::Match($versionText, '__version__\s*=\s*"(\d+\.\d+\.\d+)"')
 if (-not $match.Success) { Fail "无法从 cdc\version.py 读取当前版本号" }
 $oldVersion = $match.Groups[1].Value
-if ($oldVersion -eq $Version) { Fail "当前版本已经是 $Version，无需发布" }
+$sameVersion = ($oldVersion -eq $Version)
 
 $tag = "v$Version"
 $oldTag = "v$oldVersion"
@@ -142,7 +142,11 @@ if ($dirty.Count -gt 0 -and -not $AllowDirty -and -not $DryRun) {
 
 $changelog = Join-Path $root 'CHANGELOG.md'
 $changelogText = [System.IO.File]::ReadAllText($changelog)
-if (-not $changelogText.Contains('## [未发布]')) {
+if ($sameVersion) {
+    if (-not $changelogText.Contains("## [$Version]")) {
+        Fail "版本号已是 $Version，但 CHANGELOG.md 里没有 '## [$Version]' 段落"
+    }
+} elseif (-not $changelogText.Contains('## [未发布]')) {
     Fail "CHANGELOG.md 里没有 '## [未发布]' 段落，无法自动归档本次发布说明"
 }
 
@@ -152,7 +156,8 @@ if ($SkipBuild -and -not $NoPush) {
 
 $date = Get-Date -Format 'yyyy-MM-dd'
 $plan = @(
-    "版本：$oldVersion -> $Version（标签 $tag）",
+    $(if ($sameVersion) { "版本：$Version（已是目标值，跳过改版本号，标签 $tag）" }
+      else { "版本：$oldVersion -> $Version（标签 $tag）" }),
     "发布说明：$NotesFile",
     "标题：$Title",
     "步骤：改版本号 -> $(if ($SkipTests) { '跳过测试' } else { '跑测试' }) -> 打包 -> 生成 SHA256 -> 提交/打标签",
@@ -170,6 +175,9 @@ if ($DryRun) {
 Write-Step "开始发布 CDriveCleaner $tag"
 
 # 1) 版本号
+if ($sameVersion) {
+    Write-Step "1/7 版本号已是 $Version，跳过更新（继续测试 / 打包 / 提交）"
+} else {
 Write-Step "1/7 更新版本号"
 Replace-InFile 'cdc\version.py' "__version__ = `"$oldVersion`"" "__version__ = `"$Version`""
 Replace-InFile 'packaging\build.ps1' "`$version = '$oldVersion'" "`$version = '$Version'"
@@ -193,6 +201,7 @@ $changelogNew = $changelogText.Replace('## [未发布]', "## [$Version] - $date"
 Save-TextPreserveBom $changelog $changelogNew
 Write-Ok "CHANGELOG.md -> [$Version] - $date"
 
+}
 # 2) 测试
 if ($SkipTests) {
     Write-Step "2/7 跳过测试（-SkipTests）"
