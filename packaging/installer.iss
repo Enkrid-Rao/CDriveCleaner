@@ -3,7 +3,7 @@
 ; 前置：先运行 packaging\build.ps1（或 python -m PyInstaller packaging\CDriveCleaner.spec）
 
 #define MyAppName "CDriveCleaner"
-#define MyAppVersion "2.3.8"
+#define MyAppVersion "2.3.9"
 #define MyAppPublisher "Enkrid Rao"
 #define MyAppURL "https://github.com/Enkrid-Rao/CDriveCleaner"
 #define MyAppExeName "CDriveCleaner.exe"

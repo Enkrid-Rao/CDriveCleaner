@@ -102,6 +102,48 @@ def _nav_button(parent: QWidget, icon_name: str, text: str,
     return btn
 
 
+class _DirTree(QTreeWidget):
+    """目录树：补齐文件管理器里习惯的键盘 / 修饰键选择。"""
+
+    def __init__(self, dialog: "DirPickerDialog") -> None:
+        super().__init__()
+        self._dialog = dialog
+
+    def keyPressEvent(self, event) -> None:  # noqa: N802
+        mods = event.modifiers()
+        if mods & Qt.ControlModifier and event.key() == Qt.Key_A:
+            if mods & Qt.ShiftModifier:
+                self._dialog.clear_all_checks()
+            else:
+                self._dialog.check_all_visible()
+            event.accept()
+            return
+        if event.key() == Qt.Key_Space:
+            item = self.currentItem()
+            if item is not None and item.data(0, Qt.UserRole):
+                self._dialog.toggle_item(item)
+                event.accept()
+                return
+        super().keyPressEvent(event)
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802
+        if event.button() == Qt.LeftButton:
+            pos = event.position().toPoint()
+            item = self.itemAt(pos)
+            mods = event.modifiers()
+            if item is not None and item.data(0, Qt.UserRole):
+                if mods & Qt.ShiftModifier:
+                    self._dialog.check_range(item)
+                    event.accept()
+                    return
+                if mods & Qt.ControlModifier:
+                    self._dialog.toggle_item(item)
+                    event.accept()
+                    return
+                self._dialog._anchor = item
+        super().mousePressEvent(event)
+
+
 class DirPickerDialog(QDialog):
     """目录树多选对话框：勾选目录 → 确定 → 结果在 ``picked``。"""
 
@@ -114,8 +156,11 @@ class DirPickerDialog(QDialog):
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setModal(True)
         self.picked: list[str] = []
+        self._selected: dict[str, str] = {}   # normcase(path) -> 原始 path，跨目录保留
         self._current = ""
         self._quick = list(quick or [])
+        self._filling = False
+        self._anchor = None
         self.resize(960, 660)
 
         outer = QVBoxLayout(self)
@@ -172,7 +217,30 @@ class DirPickerDialog(QDialog):
         bar.addWidget(self.btn_go)
         right.addLayout(bar)
 
-        self.tree = QTreeWidget()
+        tools = QHBoxLayout()
+        tools.setSpacing(6)
+        self.btn_all = QPushButton("全选")
+        self.btn_all.setObjectName("Link")
+        self.btn_all.setCursor(Qt.PointingHandCursor)
+        self.btn_all.setToolTip("勾选当前列表里的全部目录（Ctrl+A）")
+        self.btn_all.clicked.connect(self.check_all_visible)
+        self.btn_invert = QPushButton("反选")
+        self.btn_invert.setObjectName("Link")
+        self.btn_invert.setCursor(Qt.PointingHandCursor)
+        self.btn_invert.setToolTip("把当前列表的勾选状态反过来")
+        self.btn_invert.clicked.connect(self.invert_visible)
+        self.btn_clear = QPushButton("清空")
+        self.btn_clear.setObjectName("Link")
+        self.btn_clear.setCursor(Qt.PointingHandCursor)
+        self.btn_clear.setToolTip("清空所有已勾选目录（Ctrl+Shift+A）")
+        self.btn_clear.clicked.connect(self.clear_all_checks)
+        for btn in (self.btn_all, self.btn_invert, self.btn_clear):
+            tools.addWidget(btn)
+        tools.addStretch()
+        tools.addWidget(label("Ctrl+A 全选 · Shift 连选 · 空格勾选", "Dim"))
+        right.addLayout(tools)
+
+        self.tree = _DirTree(self)
         self.tree.setHeaderHidden(True)
         self.tree.setColumnCount(1)
         self.tree.setUniformRowHeights(True)
@@ -235,10 +303,11 @@ class DirPickerDialog(QDialog):
         """)
         self.tree.itemExpanded.connect(self._on_expanded)
         self.tree.itemDoubleClicked.connect(self._on_double_clicked)
-        self.tree.itemChanged.connect(lambda *_: self._update_buttons())
+        self.tree.itemChanged.connect(self._on_item_changed)
         right.addWidget(self.tree, 1)
 
-        hint = label("勾选目录（可多选）；双击展开一级。Junction 标 →，隐藏目录灰色显示。",
+        hint = label("勾选目录（可多选，切换目录后已勾选的不会丢）；双击展开一级。"
+                     "Junction 标 →，隐藏目录灰色显示。",
                      "Muted", wrap=True)
         right.addWidget(hint)
         body.addLayout(right, 1)
@@ -364,6 +433,7 @@ class DirPickerDialog(QDialog):
             return
         folder_icon = QIcon(icons.icon_pixmap("folder", theme.DIM, 18))
         link_icon = QIcon(icons.icon_pixmap("link", theme.CYAN, 18))
+        self._filling = True
         for name, full, is_link, hidden in rows:
             label_text = name + ("   →" if is_link else "")
             item = QTreeWidgetItem([label_text])
@@ -378,11 +448,14 @@ class DirPickerDialog(QDialog):
             if hidden:
                 item.setForeground(0, QColor(theme.DIM))
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable | Qt.ItemIsSelectable)
-            item.setCheckState(0, Qt.CheckState.Unchecked)
+            checked = os.path.normcase(os.path.abspath(full)) in self._selected
+            item.setCheckState(0, Qt.CheckState.Checked if checked
+                              else Qt.CheckState.Unchecked)
             dummy = QTreeWidgetItem([""])
             dummy.setFlags(Qt.ItemIsEnabled)
             item.addChild(dummy)  # 占位，保证有展开箭头
             container.addChild(item)
+        self._filling = False
 
     def _on_expanded(self, item: QTreeWidgetItem) -> None:
         path = item.data(0, Qt.UserRole)
@@ -408,24 +481,92 @@ class DirPickerDialog(QDialog):
 
     # ---------- 选择 ----------
 
+    @staticmethod
+    def _key(path: str) -> str:
+        return os.path.normcase(os.path.abspath(path))
+
+    def _on_item_changed(self, item: QTreeWidgetItem, _column: int = 0) -> None:
+        if self._filling:
+            return
+        path = item.data(0, Qt.UserRole)
+        if not path:
+            return
+        if item.checkState(0) == Qt.CheckState.Checked:
+            self._selected[self._key(path)] = path
+        else:
+            self._selected.pop(self._key(path), None)
+        self._update_buttons()
+
+    def _set_checked(self, item: QTreeWidgetItem, checked: bool) -> None:
+        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+        if item.checkState(0) == state:
+            return
+        if self._filling:
+            item.setCheckState(0, state)
+            return
+        item.setCheckState(0, state)
+
+    def toggle_item(self, item: QTreeWidgetItem) -> None:
+        """空格 / Ctrl+点击：切换单个目录的勾选。"""
+        checking = item.checkState(0) != Qt.CheckState.Checked
+        self._set_checked(item, checking)
+        self._anchor = item
+
+    def _visible_items(self) -> list[QTreeWidgetItem]:
+        items: list[QTreeWidgetItem] = []
+
+        def walk(parent: QTreeWidgetItem) -> None:
+            for index in range(parent.childCount()):
+                child = parent.child(index)
+                if child.data(0, Qt.UserRole):
+                    items.append(child)
+                walk(child)
+
+        walk(self.tree.invisibleRootItem())
+        return items
+
+    def check_all_visible(self) -> None:
+        """Ctrl+A / 全选：勾选当前列表里所有已加载的目录。"""
+        for item in self._visible_items():
+            self._set_checked(item, True)
+        self._update_buttons()
+
+    def clear_all_checks(self) -> None:
+        """Ctrl+Shift+A / 清空：清空全部已勾选目录（含其它目录里勾的）。"""
+        self._selected.clear()
+        for item in self._visible_items():
+            self._set_checked(item, False)
+        self._update_buttons()
+
+    def invert_visible(self) -> None:
+        for item in self._visible_items():
+            self._set_checked(item, item.checkState(0) != Qt.CheckState.Checked)
+        self._update_buttons()
+
+    def check_range(self, item: QTreeWidgetItem) -> None:
+        """Shift+点击：从上一个点击项连选到这一项。"""
+        items = self._visible_items()
+        anchor = self._anchor if self._anchor in items else None
+        if anchor is None:
+            self.toggle_item(item)
+            return
+        start = items.index(anchor)
+        end = items.index(item)
+        lo, hi = (start, end) if start <= end else (end, start)
+        for row in items[lo:hi + 1]:
+            self._set_checked(row, True)
+        self._anchor = item
+        self._update_buttons()
+
     def _checked(self) -> list[str]:
-        rows: list[str] = []
-        stack = [self.tree.topLevelItem(i) for i in range(self.tree.topLevelItemCount())]
-        while stack:
-            item = stack.pop()
-            if item is None:
-                continue
-            path = item.data(0, Qt.UserRole)
-            if path and item.checkState(0) == Qt.CheckState.Checked:
-                rows.append(path)
-            stack.extend(item.child(i) for i in range(item.childCount()))
-        return rows
+        return list(self._selected.values())
 
     def _update_buttons(self) -> None:
-        count = len(self._checked())
+        count = len(self._selected)
         self.btn_ok.setText(f"添加选中（{count}）" if count else "添加选中")
         self.btn_ok.setEnabled(True)
         self.selected_label.setText(f"已选 {count} 项" if count else "已选 0 项")
+        self.btn_clear.setEnabled(count > 0)
 
     def _add_current(self) -> None:
         self.picked = [self._current]

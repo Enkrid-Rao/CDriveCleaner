@@ -18,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-$version = '2.3.8'
+$version = '2.3.9'
 $dist = Join-Path $root 'dist'
 $payload = Join-Path $dist 'CDriveCleaner'
 $exe = Join-Path $payload 'CDriveCleaner.exe'

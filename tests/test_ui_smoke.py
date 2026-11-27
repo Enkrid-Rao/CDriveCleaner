@@ -88,6 +88,69 @@ class UISmokeTests(unittest.TestCase):
         finally:
             dialog.close()
 
+    def test_dir_picker_keyboard_and_cross_folder_selection(self):
+        """Ctrl+A / Shift 连选 / 切换目录后勾选不丢失。"""
+        from PySide6.QtCore import QEvent
+        from PySide6.QtGui import QKeyEvent
+
+        root, _extra = base.temp_tree("picker_keys")
+        for name in ("alpha", "beta", "gamma"):
+            (root / name).mkdir()
+        other = root / "other"
+        (other / "delta").mkdir(parents=True)
+
+        state = AppState()
+        window = MainWindow(state)
+        window.show()
+        self.app.processEvents()
+        dialog = window.pages["archive"]._dir_dialog(str(root))
+        try:
+            tree = dialog.tree
+            # Ctrl+A 勾选当前列表全部
+            event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key_A,
+                              Qt.KeyboardModifier.ControlModifier)
+            tree.keyPressEvent(event)
+            self.assertGreaterEqual(len(dialog._selected), 4)
+
+            # 清空
+            dialog.clear_all_checks()
+            self.assertEqual(dialog._selected, {})
+
+            # 勾 alpha，切到 other 再勾 delta，切回来勾选仍在
+            items = {tree.topLevelItem(i).text(0).rstrip(" →"): tree.topLevelItem(i)
+                     for i in range(tree.topLevelItemCount())}
+            dialog.toggle_item(items["alpha"])
+            self.assertIn(str(root / "alpha"), dialog._selected.values())
+            dialog.set_current(str(other))
+            self.app.processEvents()
+            self.assertIn(str(root / "alpha"), dialog._selected.values())
+            other_items = [dialog.tree.topLevelItem(i)
+                           for i in range(dialog.tree.topLevelItemCount())]
+            self.assertEqual(len(other_items), 1)
+            dialog.toggle_item(other_items[0])
+            self.assertIn(str(other / "delta"), dialog._selected.values())
+
+            # Shift 连选：回到 root 后从 alpha 连到 gamma
+            dialog.set_current(str(root))
+            self.app.processEvents()
+            items = {tree.topLevelItem(i).text(0).rstrip(" →"): tree.topLevelItem(i)
+                     for i in range(tree.topLevelItemCount())}
+            dialog.toggle_item(items["alpha"])
+            dialog.check_range(items["gamma"])
+            for name in ("alpha", "beta", "gamma"):
+                self.assertIn(str(root / name), dialog._selected.values())
+
+            # 结果按勾选顺序返回
+            dialog._accept()
+            self.assertEqual(len(dialog.picked), 4)
+            self.assertIn(str(root / "alpha"), dialog.picked)
+            self.assertIn(str(other / "delta"), dialog.picked)
+        finally:
+            dialog.close()
+            window.close()
+            state.shutdown()
+            base.cleanup(root)
+
     def test_confirm_dialog_has_optional_checkbox(self):
         """归档确认框要能带一个额外勾选项（例如「压缩成 zip」）。"""
         from cdc.ui.widgets import ConfirmDialog
