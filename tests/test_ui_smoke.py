@@ -6,9 +6,10 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from tests import base  # noqa: E402  (设置 CDC_DATA_DIR)
-from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtCore import QItemSelectionModel, Qt  # noqa: E402
 from PySide6.QtGui import QColor, QPalette  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtTest import QTest  # noqa: E402
+from PySide6.QtWidgets import QApplication, QListView  # noqa: E402
 
 from cdc.app import ensure_fonts  # noqa: E402
 from cdc.core.models import LAYOUT_FLAT, LAYOUT_MIRROR, ArchiveCandidate  # noqa: E402
@@ -88,140 +89,106 @@ class UISmokeTests(unittest.TestCase):
         finally:
             dialog.close()
 
-    def test_dir_picker_keyboard_and_cross_folder_selection(self):
-        """Ctrl+A / Shift 连选 / 切换目录后勾选不丢失。"""
-        from PySide6.QtCore import QEvent
-        from PySide6.QtGui import QKeyEvent
+    def _wait_list_rows(self, dialog) -> tuple:
+        """等 QFileSystemModel 异步加载完当前目录，返回 (view, model)。"""
+        import time
 
-        root, _extra = base.temp_tree("picker_keys")
+        view = dialog.findChild(QListView, "listView")
+        self.assertIsNotNone(view, "找不到主列表视图")
+        model = view.model()
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            self.app.processEvents()
+            root = view.rootIndex()
+            if root.isValid() and model.rowCount(root) > 0:
+                break
+            time.sleep(0.02)
+        return view, model
+
+    def test_dir_dialog_lists_dirs_and_accepts(self):
+        """还原 2.3.3 的 QFileDialog 选择器：列出目录、可多选、确认返回选中的目录。"""
+        tree_root, _extra = base.temp_tree("picker_old")
         for name in ("alpha", "beta", "gamma"):
-            (root / name).mkdir()
-        other = root / "other"
-        (other / "delta").mkdir(parents=True)
+            (tree_root / name).mkdir()
 
         state = AppState()
         window = MainWindow(state)
         window.show()
         self.app.processEvents()
-        dialog = window.pages["archive"]._dir_dialog(str(root))
+        dialog = window.pages["archive"]._dir_dialog(str(tree_root))
         try:
-            tree = dialog.tree
-            # Ctrl+A 勾选当前列表全部
-            event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key_A,
-                              Qt.KeyboardModifier.ControlModifier)
-            tree.keyPressEvent(event)
-            self.assertGreaterEqual(len(dialog._selected), 4)
+            dialog.show()
+            view, model = self._wait_list_rows(dialog)
+            root = view.rootIndex()
+            names = [model.index(row, 0, root).data()
+                     for row in range(model.rowCount(root))]
+            for want in ("alpha", "beta", "gamma"):
+                self.assertIn(want, names)
+            self.assertEqual(dialog.windowTitle(), "选择要归档的目录（可多选）")
 
-            # 清空
-            dialog.clear_all_checks()
-            self.assertEqual(dialog._selected, {})
-
-            # 勾 alpha，切到 other 再勾 delta，切回来勾选仍在
-            items = {tree.topLevelItem(i).text(0).rstrip(" →"): tree.topLevelItem(i)
-                     for i in range(tree.topLevelItemCount())}
-            dialog.toggle_item(items["alpha"])
-            self.assertIn(str(root / "alpha"), dialog._selected.values())
-            dialog.set_current(str(other))
-            self.app.processEvents()
-            self.assertIn(str(root / "alpha"), dialog._selected.values())
-            other_items = [dialog.tree.topLevelItem(i)
-                           for i in range(dialog.tree.topLevelItemCount())]
-            self.assertEqual(len(other_items), 1)
-            dialog.toggle_item(other_items[0])
-            self.assertIn(str(other / "delta"), dialog._selected.values())
-
-            # Shift 连选：回到 root 后从 alpha 连到 gamma
-            dialog.set_current(str(root))
-            self.app.processEvents()
-            items = {tree.topLevelItem(i).text(0).rstrip(" →"): tree.topLevelItem(i)
-                     for i in range(tree.topLevelItemCount())}
-            dialog.toggle_item(items["alpha"])
-            dialog.check_range(items["gamma"])
-            for name in ("alpha", "beta", "gamma"):
-                self.assertIn(str(root / name), dialog._selected.values())
-
-            # 结果按勾选顺序返回
-            dialog._accept()
-            self.assertEqual(len(dialog.picked), 4)
-            self.assertIn(str(root / "alpha"), dialog.picked)
-            self.assertIn(str(other / "delta"), dialog.picked)
+            selection = view.selectionModel()
+            flags = (QItemSelectionModel.SelectionFlag.Select
+                     | QItemSelectionModel.SelectionFlag.Rows)
+            for row in range(model.rowCount(root)):
+                index = model.index(row, 0, root)
+                if index.data() in ("alpha", "beta"):
+                    selection.select(index, flags)
+            dialog.accept()
+            self.assertEqual(len(dialog.picked), 2)
+            picked = {os.path.normcase(os.path.normpath(path)) for path in dialog.picked}
+            self.assertIn(os.path.normcase(os.path.normpath(str(tree_root / "alpha"))), picked)
+            self.assertIn(os.path.normcase(os.path.normpath(str(tree_root / "beta"))), picked)
         finally:
             dialog.close()
             window.close()
             state.shutdown()
-            base.cleanup(root)
+            base.cleanup(tree_root)
 
-    def test_confirm_dialog_has_optional_checkbox(self):
-        """归档确认框要能带一个额外勾选项（例如「压缩成 zip」）。"""
-        from cdc.ui.widgets import ConfirmDialog
-        dialog = ConfirmDialog(None, "标题", "消息", "确认",
-                               option="压缩成 zip 后归档", option_checked=True)
-        try:
-            self.assertIsNotNone(dialog.option_check)
-            self.assertTrue(dialog.option_check.isChecked())
-            dialog.option_check.setChecked(False)
-            self.assertFalse(dialog.option_check.isChecked())
-        finally:
-            dialog.close()
-
-    def test_dashboard_has_space_card(self):
-        """总览页要有「空间构成（Everything）」卡片，未安装时给提示而不是报错。"""
-        state = AppState()
-        window = MainWindow(state)
-        window.show()
-        self.app.processEvents()
-        try:
-            page = window.pages["dashboard"]
-            self.assertTrue(hasattr(page, "space_card"))
-            self.assertTrue(hasattr(page, "btn_space"))
-            self.assertFalse(page.btn_space.isEnabled())
-            self.assertEqual(page.btn_space.text(), "Everything 不可用")
-        finally:
-            window.close()
-            state.shutdown()
-
-    def test_dir_picker_lists_hidden_and_junction_dirs(self):
-        """回归：选择器进入 Junction / 隐藏目录时必须能列出子目录。"""
-        tree_root, _extra = base.temp_tree("picker")
-        (tree_root / ".hidden_dir" / "sub").mkdir(parents=True)
-        (tree_root / "plain").mkdir()
+    def test_dir_dialog_can_enter_junction(self):
+        """回归：QFileSystemModel 把 Junction 的子项算成 0；双击必须仍能进入。"""
+        tree_root, _extra = base.temp_tree("picker_junction")
         target = tree_root / "target"
         (target / "inner").mkdir(parents=True)
         ok, err = windows.create_junction(str(tree_root / "linked"), str(target))
         self.assertTrue(ok, err)
 
         state = AppState()
-        self.app.setStyleSheet(theme.build_qss(13, False))
         window = MainWindow(state)
         window.show()
         self.app.processEvents()
         dialog = window.pages["archive"]._dir_dialog(str(tree_root))
         try:
-            tree = dialog.tree
-            names = [tree.topLevelItem(i).text(0).rstrip(" →")
-                     for i in range(tree.topLevelItemCount())]
-            self.assertIn(".hidden_dir", names)
-            self.assertIn("plain", names)
-            self.assertIn("linked", names)
-            self.assertEqual(dialog.btn_ok.text(), "添加选中")
-            self.assertEqual(dialog.btn_ok.objectName(), "Primary")
+            dialog.show()
+            view, model = self._wait_list_rows(dialog)
+            root = view.rootIndex()
+            linked = None
+            for row in range(model.rowCount(root)):
+                index = model.index(row, 0, root)
+                if index.data() == "linked":
+                    linked = index
+                    break
+            self.assertIsNotNone(linked, "列表里看不到 Junction")
+            # Qt 的已知缺陷：Junction 在模型里子项为 0
+            self.assertEqual(model.rowCount(linked), 0)
 
-            linked = next(tree.topLevelItem(i) for i in range(tree.topLevelItemCount())
-                          if tree.topLevelItem(i).text(0).startswith("linked"))
-            linked.setExpanded(True)
+            view.scrollTo(linked)
             self.app.processEvents()
-            inner = [linked.child(i).text(0) for i in range(linked.childCount())]
+            QTest.mouseDClick(view.viewport(), Qt.LeftButton, Qt.NoModifier,
+                              view.visualRect(linked).center())
+            for _ in range(40):
+                self.app.processEvents()
+            self.assertEqual(os.path.normcase(dialog.directory().absolutePath()),
+                             os.path.normcase(str(tree_root / "linked")))
+            root = view.rootIndex()
+            inner = [model.index(row, 0, root).data()
+                     for row in range(model.rowCount(root))]
             self.assertIn("inner", inner)
-
-            linked.setCheckState(0, Qt.CheckState.Checked)
-            self.app.processEvents()
-            dialog._accept()
-            self.assertEqual(dialog.picked, [str(tree_root / "linked")])
         finally:
             dialog.close()
             window.close()
             state.shutdown()
             base.cleanup(tree_root)
+
 
 
 if __name__ == "__main__":

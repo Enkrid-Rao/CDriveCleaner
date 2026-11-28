@@ -20,7 +20,7 @@ from ...core.models import (
     human_bytes,
 )
 from .. import theme
-from ..dir_picker import DirPickerDialog, last_dir
+from ..dir_dialog import DirPickerDialog
 from ..widgets import (
     Check, ConfirmDialog, DriveCard, ElidedLabel, EmptyState, GlassCard,
     IconButton, IconTile, PageHeader, PathPicker, Pill, ScrollPage,
@@ -556,18 +556,12 @@ class ArchivePage(QWidget):
         return rows
 
     def _dir_dialog(self, start: str) -> DirPickerDialog:
-        """打开自绘的目录树多选器（不依赖 QFileDialog 的目录模式）。"""
-        quick: list[tuple[str, str, str]] = []
-        home = os.path.expanduser("~")
-        quick.append(("user", "用户目录", home))
-        archive_root = self._archive_root()
-        if archive_root and os.path.isdir(archive_root):
-            quick.append(("archive", "归档盘", archive_root))
-        return DirPickerDialog(self.window(), start, quick=quick)
+        """可多选目录的 QFileDialog（外观与 2.3.3 一致）。"""
+        return DirPickerDialog(self.window(), "选择要归档的目录（可多选）", start)
 
     def _pick_custom_root(self) -> None:
         start = (self.custom_dirs[-1] if self.custom_dirs else
-                 (last_dir() or os.path.expanduser("~")))
+                 (self._archive_root() or "D:\\"))
         dialog = self._dir_dialog(start)
         if not dialog.exec():
             return

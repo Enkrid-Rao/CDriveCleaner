@@ -19,7 +19,7 @@ from ...core.models import (
     ACTION_UNLINK, MODE_COPY, OperationItem, OperationRecord, human_bytes,
 )
 from .. import theme
-from ..dir_picker import DirPickerDialog
+from ..dir_dialog import DirPickerDialog
 from ..widgets import (
     ConfirmDialog, ElidedLabel, EmptyState, GlassCard, IconButton, IconTile,
     InfoDialog, PageHeader, Pill, SearchField, ScrollPage, StatTile,
@@ -293,11 +293,7 @@ class HistoryPage(ScrollPage):
             self.state.toast.emit("正在执行其它操作，等它结束再复原", "warn")
             return
         start = self.state.config.archive_root or "E:\\"
-        quick = [("archive", "归档盘", start)] if os.path.isdir(start) else []
-        dialog = DirPickerDialog(self.window(), start,
-                                 title="选择要复原的归档目录",
-                                 subtitle="选归档根目录下的某个目录，会自动反推原始路径。",
-                                 quick=quick)
+        dialog = DirPickerDialog(self.window(), "选择要复原的归档目录", start)
         if not dialog.exec():
             return
         if len(dialog.picked) != 1:
